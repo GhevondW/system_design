@@ -39,3 +39,19 @@
 
 # debug information files
 *.dwo
+
+# Build directories
+build*/
+cmake-build*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# WASM output
+*.wasm
+*.wasm.map
