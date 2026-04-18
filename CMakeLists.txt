@@ -40,6 +40,7 @@ add_library(systemforge_engine STATIC
     src/lang/token.cpp
     src/lang/value.cpp
     src/lang/lexer.cpp
+    src/lang/parser.cpp
 )
 
 target_include_directories(systemforge_engine PUBLIC
@@ -99,6 +100,7 @@ else()
         tests/engine/placeholder_test.cpp
         tests/lang/value_test.cpp
         tests/lang/lexer_test.cpp
+        tests/lang/parser_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
