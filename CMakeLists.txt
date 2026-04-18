@@ -41,6 +41,8 @@ add_library(systemforge_engine STATIC
     src/lang/value.cpp
     src/lang/lexer.cpp
     src/lang/parser.cpp
+    src/lang/environment.cpp
+    src/lang/interpreter.cpp
 )
 
 target_include_directories(systemforge_engine PUBLIC
@@ -101,6 +103,7 @@ else()
         tests/lang/value_test.cpp
         tests/lang/lexer_test.cpp
         tests/lang/parser_test.cpp
+        tests/lang/interpreter_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
