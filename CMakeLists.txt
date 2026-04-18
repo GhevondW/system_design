@@ -37,6 +37,9 @@ target_include_directories(nlohmann_json INTERFACE
 # Shared between native and WASM targets (no main())
 add_library(systemforge_engine STATIC
     src/engine/version.cpp
+    src/lang/token.cpp
+    src/lang/value.cpp
+    src/lang/lexer.cpp
 )
 
 target_include_directories(systemforge_engine PUBLIC
@@ -94,6 +97,8 @@ else()
 
     add_executable(systemforge_tests
         tests/engine/placeholder_test.cpp
+        tests/lang/value_test.cpp
+        tests/lang/lexer_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
