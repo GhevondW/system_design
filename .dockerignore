@@ -1,0 +1,8 @@
+build/
+build-native/
+build-wasm/
+.git
+*.o
+*.a
+*.so
+*.dylib

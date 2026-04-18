@@ -1,0 +1,3 @@
+[submodule "third_party/cortex"]
+	path = third_party/cortex
+	url = https://github.com/GhevondW/cortex.git
