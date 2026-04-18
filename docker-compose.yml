@@ -1,0 +1,79 @@
+services:
+  # Run native C++ tests
+  test-native:
+    build: .
+    volumes: [".:/workspace"]
+    environment:
+      - BUILD_TYPE=${BUILD_TYPE:-Debug}
+    command: >
+      bash -c "
+      cmake -B build/native -G Ninja -DCMAKE_BUILD_TYPE=$${BUILD_TYPE} &&
+      cmake --build build/native &&
+      ctest --test-dir build/native --output-on-failure
+      "
+
+  # Run WASM tests via Node.js
+  test-wasm:
+    build: .
+    volumes: [".:/workspace"]
+    environment:
+      - BUILD_TYPE=${BUILD_TYPE:-Debug}
+    command: >
+      bash -c "
+      source /opt/emsdk/emsdk_env.sh &&
+      rm -rf build/wasm &&
+      emcmake cmake -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=$${BUILD_TYPE} &&
+      cmake --build build/wasm
+      "
+
+  # Build native binary
+  build-native:
+    build: .
+    volumes: [".:/workspace"]
+    environment:
+      - BUILD_TYPE=${BUILD_TYPE:-Release}
+    command: >
+      bash -c "
+      cmake -B build/native -G Ninja -DCMAKE_BUILD_TYPE=$${BUILD_TYPE} &&
+      cmake --build build/native &&
+      echo 'Native build succeeded' &&
+      ./build/native/systemforge
+      "
+
+  # Build WASM and serve web UI
+  serve:
+    build: .
+    volumes: [".:/workspace"]
+    ports:
+      - "8080:8080"
+    environment:
+      - BUILD_TYPE=${BUILD_TYPE:-Release}
+    command: >
+      bash -c "
+      source /opt/emsdk/emsdk_env.sh &&
+      emcmake cmake -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=$${BUILD_TYPE} &&
+      cmake --build build/wasm &&
+      echo '' &&
+      echo 'SystemForge built successfully!' &&
+      echo '' &&
+      echo '  -> http://localhost:8080' &&
+      echo '' &&
+      cd web &&
+      python3 -m http.server 8080
+      "
+
+  # Interactive development shell
+  shell:
+    build: .
+    volumes: [".:/workspace"]
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Interactive shell with Emscripten
+  wasm-shell:
+    build: .
+    volumes: [".:/workspace"]
+    stdin_open: true
+    tty: true
+    command: bash -c "source /opt/emsdk/emsdk_env.sh && bash"
