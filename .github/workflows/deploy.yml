@@ -21,13 +21,12 @@ jobs:
       image: emscripten/emsdk:latest
 
     steps:
+      - name: Install git
+        run: apt-get update && apt-get install -y git ninja-build
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install build tools
-        run: |
-          apt-get update && apt-get install -y ninja-build
 
       - name: Build WASM
         run: |

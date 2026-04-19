@@ -13,16 +13,16 @@ jobs:
       image: ubuntu:24.04
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y clang-19 cmake ninja-build git
+          apt-get install -y git clang-19 cmake ninja-build
           update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-19 100
           update-alternatives --install /usr/bin/cc cc /usr/bin/clang-19 100
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Build
         run: |
@@ -41,13 +41,12 @@ jobs:
       image: emscripten/emsdk:latest
 
     steps:
+      - name: Install git
+        run: apt-get update && apt-get install -y git ninja-build
+
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install build tools
-        run: |
-          apt-get update && apt-get install -y ninja-build
 
       - name: Build WASM
         run: |
