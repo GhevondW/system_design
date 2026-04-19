@@ -19,7 +19,8 @@ print_usage() {
     echo "Commands:"
     echo "  test-native       Run native C++ tests"
     echo "  test-wasm         Build WASM target"
-    echo "  test-all          Run all tests"
+    echo "  test-ui           Run web UI unit tests (JSDOM)"
+    echo "  test-all          Run all tests (native + wasm + ui)"
     echo "  build             Build native binary"
     echo "  serve             Build WASM and serve web UI (port 8080)"
     echo "  clean             Clean all build artifacts"
@@ -41,10 +42,14 @@ case "${1:-help}" in
     test-wasm)
         run_command "WASM Build" "test-wasm"
         ;;
+    test-ui)
+        run_command "Web UI Tests" "test-ui"
+        ;;
     test-all)
         echo -e "${GREEN}Running all tests...${NC}"
         docker compose up --build test-native
         docker compose up --build test-wasm
+        docker compose up --build test-ui
         echo -e "${GREEN}All tests passed!${NC}"
         ;;
     build)

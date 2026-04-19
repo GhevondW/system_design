@@ -1,0 +1,12 @@
+{
+  "name": "systemforge-web-tests",
+  "version": "0.0.0",
+  "private": true,
+  "description": "JSDOM-based unit tests for the SystemForge web UI. Run via ./dev.sh test-ui.",
+  "scripts": {
+    "test": "node --test tests/web/"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

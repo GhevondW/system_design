@@ -57,3 +57,6 @@ cmake-build*/
 *.wasm.map
 /web/systemforge.js
 /web/systemforge.wasm
+
+# Node (web UI test harness — see package.json)
+/node_modules/

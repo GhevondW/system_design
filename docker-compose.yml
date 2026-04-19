@@ -26,6 +26,17 @@ services:
       cmake --build build/wasm
       "
 
+  # Run web UI unit tests (node --test + JSDOM)
+  test-ui:
+    build: .
+    volumes: [".:/workspace"]
+    working_dir: /workspace
+    command: >
+      bash -c "
+      npm install --no-audit --no-fund --silent &&
+      node --test tests/web/
+      "
+
   # Build native binary
   build-native:
     build: .
