@@ -5,6 +5,7 @@
 #include "components/cache.h"
 #include "components/database.h"
 #include "components/http_server.h"
+#include "components/load_balancer.h"
 #include "lang/lexer.h"
 #include "lang/parser.h"
 
@@ -247,6 +248,17 @@ void SimulationEngine::WireConnections() {
                 }));
         }
     }
+
+    // Wire load balancer targets
+    for (const auto& [id, comp] : graph_.GetComponents()) {
+        if (comp->GetType() == ComponentType::kLoadBalancer) {
+            auto* lb = dynamic_cast<components::LoadBalancer*>(comp.get());
+            if (!lb) continue;
+            for (const auto* conn : graph_.GetConnectionsFrom(id)) {
+                lb->AddTarget(conn->to);
+            }
+        }
+    }
 }
 
 // --- Private: Async wiring (fibers yield on cross-component calls) ---
@@ -366,6 +378,17 @@ void SimulationEngine::WireAsyncConnections() {
                             return lang::ScriptValue(cache->Has(args[0].AsString()));
                         }})},
                 }));
+        }
+    }
+
+    // Wire load balancer targets
+    for (const auto& [id, comp] : graph_.GetComponents()) {
+        if (comp->GetType() == ComponentType::kLoadBalancer) {
+            auto* lb = dynamic_cast<components::LoadBalancer*>(comp.get());
+            if (!lb) continue;
+            for (const auto* conn : graph_.GetConnectionsFrom(id)) {
+                lb->AddTarget(conn->to);
+            }
         }
     }
 }

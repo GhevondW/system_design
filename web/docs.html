@@ -51,6 +51,7 @@
                     <a href="#comp-server" class="sidebar-link">HTTP Server</a>
                     <a href="#comp-database" class="sidebar-link">Database</a>
                     <a href="#comp-cache" class="sidebar-link">Cache</a>
+                    <a href="#comp-lb" class="sidebar-link">Load Balancer</a>
                 </div>
                 <div class="sidebar-section">
                     <div class="sidebar-title">Database Operations</div>
@@ -84,6 +85,7 @@
                         <tr><td><strong>HTTP Server</strong></td><td>Handles requests, runs your handler functions</td><td>Yes</td></tr>
                         <tr><td><strong>Database</strong></td><td>Relational storage with typed schema</td><td>You design the schema</td></tr>
                         <tr><td><strong>Cache</strong></td><td>Fast key-value store</td><td>No — use via API</td></tr>
+                        <tr><td><strong>Load Balancer</strong></td><td>Distributes requests across servers</td><td>No — automatic round-robin</td></tr>
                     </tbody>
                 </table>
             </section>
@@ -397,6 +399,25 @@ cache.set("key", "value");</code></pre>
                         <tr><td><code>cache.has(key)</code></td><td>Check if key exists</td><td>true/false</td></tr>
                     </tbody>
                 </table>
+            </section>
+
+            <!-- Component: Load Balancer -->
+            <section id="comp-lb">
+                <h2>Load Balancer Component</h2>
+                <p>Distributes incoming requests across multiple downstream servers using round-robin. No code needed — just connect it.</p>
+
+                <h3>How to use</h3>
+                <ol>
+                    <li>Place a Load Balancer between your Client and HTTP Servers</li>
+                    <li>Connect Client → Load Balancer</li>
+                    <li>Connect Load Balancer → Server 1, Load Balancer → Server 2, etc.</li>
+                    <li>Requests are automatically distributed in round-robin order</li>
+                </ol>
+
+                <div class="callout">
+                    <i class="fas fa-info-circle"></i>
+                    <div>The load balancer automatically tracks in-flight requests and routes responses back to the original sender.</div>
+                </div>
             </section>
 
             <!-- Database Operations -->

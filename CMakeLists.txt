@@ -57,6 +57,7 @@ add_library(systemforge_engine STATIC
     src/components/http_server.cpp
     src/components/database.cpp
     src/components/cache.cpp
+    src/components/load_balancer.cpp
     src/engine/fiber_runtime.cpp
     src/engine/simulation_engine.cpp
     src/engine/test_runner.cpp

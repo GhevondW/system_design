@@ -8,6 +8,7 @@ std::string_view ComponentTypeName(ComponentType type) {
         case ComponentType::kHttpServer: return "HttpServer";
         case ComponentType::kDatabase: return "Database";
         case ComponentType::kCache: return "Cache";
+        case ComponentType::kLoadBalancer: return "LoadBalancer";
     }
     return "Unknown";
 }

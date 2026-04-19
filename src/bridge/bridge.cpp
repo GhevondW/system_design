@@ -11,6 +11,7 @@
 #include "components/client.h"
 #include "components/database.h"
 #include "components/http_server.h"
+#include "components/load_balancer.h"
 #include "engine/simulation_engine.h"
 #include "engine/test_runner.h"
 
@@ -111,6 +112,8 @@ void BuildGraphFromJson(engine::SimulationEngine& eng, const json& graph_json) {
                 graph.AddComponent(std::move(db));
             } else if (type == "Cache") {
                 graph.AddComponent(std::make_unique<components::Cache>(id));
+            } else if (type == "LoadBalancer") {
+                graph.AddComponent(std::make_unique<components::LoadBalancer>(id));
             }
         }
     }

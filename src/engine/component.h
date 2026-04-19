@@ -15,6 +15,7 @@ enum class ComponentType : uint8_t {
     kHttpServer,
     kDatabase,
     kCache,
+    kLoadBalancer,
 };
 
 enum class ComponentState : uint8_t {

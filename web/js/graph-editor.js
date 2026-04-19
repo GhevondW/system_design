@@ -24,6 +24,7 @@ const COMPONENT_COLORS = {
     HttpServer: '#3fb950',
     Database: '#d29922',
     Cache: '#bc8cff',
+    LoadBalancer: '#f778ba',
 };
 
 const CODABLE_TYPES = new Set(['HttpServer', 'Worker']);
@@ -567,6 +568,7 @@ export class GraphEditor {
             items.push({ label: 'Add HTTP Server', icon: 'fa-server', action: () => this.addNode('HttpServer', wp.x, wp.y) });
             items.push({ label: 'Add Database', icon: 'fa-database', action: () => this.addNode('Database', wp.x, wp.y) });
             items.push({ label: 'Add Cache', icon: 'fa-bolt', action: () => this.addNode('Cache', wp.x, wp.y) });
+            items.push({ label: 'Add Load Balancer', icon: 'fa-balance-scale', action: () => this.addNode('LoadBalancer', wp.x, wp.y) });
         }
 
         this._showContextMenu(e.clientX, e.clientY, items);
