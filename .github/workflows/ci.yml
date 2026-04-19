@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-native:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y clang-19 cmake ninja-build git
+          update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-19 100
+          update-alternatives --install /usr/bin/cc cc /usr/bin/clang-19 100
+
+      - name: Build
+        run: |
+          cmake -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19
+          cmake --build build/native
+
+      - name: Test
+        run: |
+          cd build/native
+          ctest --output-on-failure
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    container:
+      image: emscripten/emsdk:latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build tools
+        run: |
+          apt-get update && apt-get install -y ninja-build
+
+      - name: Build WASM
+        run: |
+          emcmake cmake -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/wasm
