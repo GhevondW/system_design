@@ -45,31 +45,6 @@ engine::SimulationEngine* GetEngine(int handle) {
     return it->second.get();
 }
 
-// Convert ScriptValue to JSON
-json ScriptValueToJson(const lang::ScriptValue& val) {
-    if (val.IsNull()) return nullptr;
-    if (val.IsBool()) return val.AsBool();
-    if (val.IsInt()) return val.AsInt();
-    if (val.IsFloat()) return val.AsFloat();
-    if (val.IsString()) return val.AsString();
-    if (val.IsList()) {
-        json arr = json::array();
-        for (const auto& elem : val.AsList()) {
-            arr.push_back(ScriptValueToJson(elem));
-        }
-        return arr;
-    }
-    if (val.IsMap()) {
-        json obj = json::object();
-        for (const auto& [k, v] : val.AsMap()) {
-            obj[k] = ScriptValueToJson(v);
-        }
-        return obj;
-    }
-    if (val.IsError()) return json{{"error", val.AsError().message}};
-    return nullptr;
-}
-
 // Build graph from JSON
 void BuildGraphFromJson(engine::SimulationEngine& eng, const json& graph_json) {
     engine::Graph graph;
