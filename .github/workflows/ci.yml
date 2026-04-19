@@ -27,7 +27,8 @@ jobs:
       - name: Build
         run: |
           cmake -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19
+            -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 \
+            -DCMAKE_CXX_SCAN_FOR_MODULES=OFF
           cmake --build build/native
 
       - name: Test
