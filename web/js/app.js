@@ -163,6 +163,7 @@ class App {
         this._renderDescription(problem.description);
         this._clearTestResults();
         this._setupCodeTabs(problem);
+        this._updateAutocomplete();
 
         const serverNode = this.graphEditor.nodes.find(n => n.type === 'HttpServer');
         if (serverNode) {
@@ -314,6 +315,21 @@ class App {
         }
         el.innerHTML = html;
         this._log(results.all_passed ? 'info' : 'error', `Tests: ${results.passed}/${results.total} passed`);
+    }
+
+    _updateAutocomplete() {
+        const components = [];
+        for (const edge of this.graphEditor.edges) {
+            const targetNode = this.graphEditor.nodes.find(n => n.id === edge.to);
+            if (targetNode) {
+                components.push({
+                    alias: edge.alias,
+                    type: targetNode.type,
+                    tables: targetNode.tables || {},
+                });
+            }
+        }
+        this.codeEditor.setConnectedComponents(components);
     }
 
     _clearTestResults() {
