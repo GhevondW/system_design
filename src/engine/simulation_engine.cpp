@@ -158,21 +158,54 @@ void SimulationEngine::WireConnections() {
 
             interpreter_.InjectVariable(conn.alias,
                 lang::ScriptValue(lang::ScriptMap{
-                    {"query", lang::ScriptValue(lang::NativeFunction{
+                    {"Insert", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.empty()) return lang::ScriptValue::Error("query requires SQL");
-                            auto params = args.size() > 1 ? args[1] : lang::ScriptValue::Null();
-                            return db->Query(args[0].AsString(), params);
+                            if (args.size() < 2) return lang::ScriptValue::Error("Insert requires table name and row map");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Insert: second argument must be a map");
+                            return db->Insert(args[0].AsString(), args[1].AsMap());
                         }})},
-                    {"execute", lang::ScriptValue(lang::NativeFunction{
+                    {"Find", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.empty()) return lang::ScriptValue::Error("execute requires SQL");
-                            auto params = args.size() > 1 ? args[1] : lang::ScriptValue::Null();
-                            return db->Execute(args[0].AsString(), params);
+                            if (args.empty()) return lang::ScriptValue::Error("Find requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
+                            return db->Find(args[0].AsString(), filter);
                         }})},
-                    {"createTable", lang::ScriptValue(lang::NativeFunction{
+                    {"FindOne", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.size() < 2) return lang::ScriptValue::Error("createTable requires name and columns");
+                            if (args.empty()) return lang::ScriptValue::Error("FindOne requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
+                            return db->FindOne(args[0].AsString(), filter);
+                        }})},
+                    {"Update", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 3) return lang::ScriptValue::Error("Update requires table, filter, and updates");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Update: filter must be a map");
+                            if (!args[2].IsMap()) return lang::ScriptValue::Error("Update: updates must be a map");
+                            return db->Update(args[0].AsString(), args[1].AsMap(), args[2].AsMap());
+                        }})},
+                    {"Delete", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 2) return lang::ScriptValue::Error("Delete requires table name and filter");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Delete: filter must be a map");
+                            return db->Delete(args[0].AsString(), args[1].AsMap());
+                        }})},
+                    {"All", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.empty()) return lang::ScriptValue::Error("All requires table name");
+                            return db->All(args[0].AsString());
+                        }})},
+                    {"Count", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.empty()) return lang::ScriptValue::Error("Count requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
+                            return db->Count(args[0].AsString(), filter);
+                        }})},
+                    {"CreateTable", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 2) return lang::ScriptValue::Error("CreateTable requires name and columns");
                             std::vector<std::string> cols;
                             if (args[1].IsList()) {
                                 for (const auto& c : args[1].AsList()) cols.push_back(c.AsString());
@@ -235,24 +268,61 @@ void SimulationEngine::WireAsyncConnections() {
 
             interpreter_.InjectVariable(conn.alias,
                 lang::ScriptValue(lang::ScriptMap{
-                    {"query", lang::ScriptValue(lang::NativeFunction{
+                    {"Insert", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.empty()) return lang::ScriptValue::Error("query requires SQL");
-                            auto params = args.size() > 1 ? args[1] : lang::ScriptValue::Null();
-                            // Yield to simulate DB latency — other fibers run here
+                            if (args.size() < 2) return lang::ScriptValue::Error("Insert requires table name and row map");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Insert: second argument must be a map");
                             tf::Yield();
-                            return db->Query(args[0].AsString(), params);
+                            return db->Insert(args[0].AsString(), args[1].AsMap());
                         }})},
-                    {"execute", lang::ScriptValue(lang::NativeFunction{
+                    {"Find", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.empty()) return lang::ScriptValue::Error("execute requires SQL");
-                            auto params = args.size() > 1 ? args[1] : lang::ScriptValue::Null();
+                            if (args.empty()) return lang::ScriptValue::Error("Find requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
                             tf::Yield();
-                            return db->Execute(args[0].AsString(), params);
+                            return db->Find(args[0].AsString(), filter);
                         }})},
-                    {"createTable", lang::ScriptValue(lang::NativeFunction{
+                    {"FindOne", lang::ScriptValue(lang::NativeFunction{
                         [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
-                            if (args.size() < 2) return lang::ScriptValue::Error("createTable requires name and columns");
+                            if (args.empty()) return lang::ScriptValue::Error("FindOne requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
+                            tf::Yield();
+                            return db->FindOne(args[0].AsString(), filter);
+                        }})},
+                    {"Update", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 3) return lang::ScriptValue::Error("Update requires table, filter, and updates");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Update: filter must be a map");
+                            if (!args[2].IsMap()) return lang::ScriptValue::Error("Update: updates must be a map");
+                            tf::Yield();
+                            return db->Update(args[0].AsString(), args[1].AsMap(), args[2].AsMap());
+                        }})},
+                    {"Delete", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 2) return lang::ScriptValue::Error("Delete requires table name and filter");
+                            if (!args[1].IsMap()) return lang::ScriptValue::Error("Delete: filter must be a map");
+                            tf::Yield();
+                            return db->Delete(args[0].AsString(), args[1].AsMap());
+                        }})},
+                    {"All", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.empty()) return lang::ScriptValue::Error("All requires table name");
+                            tf::Yield();
+                            return db->All(args[0].AsString());
+                        }})},
+                    {"Count", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.empty()) return lang::ScriptValue::Error("Count requires table name");
+                            lang::ScriptMap filter;
+                            if (args.size() > 1 && args[1].IsMap()) filter = args[1].AsMap();
+                            tf::Yield();
+                            return db->Count(args[0].AsString(), filter);
+                        }})},
+                    {"CreateTable", lang::ScriptValue(lang::NativeFunction{
+                        [db](std::vector<lang::ScriptValue> args) -> lang::ScriptValue {
+                            if (args.size() < 2) return lang::ScriptValue::Error("CreateTable requires name and columns");
                             std::vector<std::string> cols;
                             if (args[1].IsList()) {
                                 for (const auto& c : args[1].AsList()) cols.push_back(c.AsString());

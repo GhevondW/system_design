@@ -60,7 +60,7 @@ services:
       echo '  -> http://localhost:8080' &&
       echo '' &&
       cd web &&
-      python3 -m http.server 8080
+      python3 serve.py
       "
 
   # Interactive development shell

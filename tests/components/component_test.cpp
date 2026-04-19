@@ -12,79 +12,177 @@ namespace {
 
 TEST(Database, CreateTableAndInsert) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate", "owner"});
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
 
-    auto result = db.Execute(
-        "INSERT INTO cars (plate, owner) VALUES (?, ?)",
-        lang::ScriptValue::List({lang::ScriptValue("ABC123"), lang::ScriptValue("Alice")}));
+    auto result = db.Insert("cars", {{"plate", lang::ScriptValue("ABC123")},
+                                      {"owner", lang::ScriptValue("Alice")}});
 
     EXPECT_TRUE(result.IsMap());
-    EXPECT_EQ(result.AsMap().at("affected_rows").AsInt(), 1);
+    EXPECT_TRUE(result.AsMap().at("inserted").IsTruthy());
 }
 
-TEST(Database, QueryAfterInsert) {
+TEST(Database, FindAfterInsert) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate", "owner"});
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
 
-    db.Execute("INSERT INTO cars (plate, owner) VALUES (?, ?)",
-               lang::ScriptValue::List({lang::ScriptValue("ABC123"), lang::ScriptValue("Alice")}));
+    db.Insert("cars", {{"plate", lang::ScriptValue("ABC123")},
+                        {"owner", lang::ScriptValue("Alice")}});
 
-    auto result = db.Query("SELECT * FROM cars WHERE plate = ?",
-                           lang::ScriptValue::List({lang::ScriptValue("ABC123")}));
+    auto result = db.Find("cars", {{"plate", lang::ScriptValue("ABC123")}});
 
     ASSERT_TRUE(result.IsList());
     ASSERT_EQ(result.AsList().size(), 1);
     EXPECT_EQ(result.AsList()[0].AsMap().at("owner").AsString(), "Alice");
 }
 
-TEST(Database, QueryNoMatch) {
+TEST(Database, FindOneAfterInsert) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate"});
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
 
-    auto result = db.Query("SELECT * FROM cars WHERE plate = ?",
-                           lang::ScriptValue::List({lang::ScriptValue("NONE")}));
+    db.Insert("cars", {{"plate", lang::ScriptValue("ABC123")},
+                        {"owner", lang::ScriptValue("Alice")}});
+
+    auto result = db.FindOne("cars", {{"plate", lang::ScriptValue("ABC123")}});
+    ASSERT_TRUE(result.IsMap());
+    EXPECT_EQ(result.AsMap().at("owner").AsString(), "Alice");
+}
+
+TEST(Database, FindOneNoMatch) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate"});
+
+    auto result = db.FindOne("cars", {{"plate", lang::ScriptValue("NONE")}});
+    EXPECT_TRUE(result.IsNull());
+}
+
+TEST(Database, FindNoMatch) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate"});
+
+    auto result = db.Find("cars", {{"plate", lang::ScriptValue("NONE")}});
     ASSERT_TRUE(result.IsList());
     EXPECT_EQ(result.AsList().size(), 0);
 }
 
-TEST(Database, QueryAllRows) {
+TEST(Database, All) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate"});
-    db.Execute("INSERT INTO cars (plate) VALUES (?)",
-               lang::ScriptValue::List({lang::ScriptValue("A")}));
-    db.Execute("INSERT INTO cars (plate) VALUES (?)",
-               lang::ScriptValue::List({lang::ScriptValue("B")}));
+    db.CreateTable("cars", std::vector<std::string>{"plate"});
+    db.Insert("cars", {{"plate", lang::ScriptValue("A")}});
+    db.Insert("cars", {{"plate", lang::ScriptValue("B")}});
 
-    auto result = db.Query("SELECT * FROM cars", lang::ScriptValue::Null());
+    auto result = db.All("cars");
     ASSERT_TRUE(result.IsList());
     EXPECT_EQ(result.AsList().size(), 2);
 }
 
 TEST(Database, Delete) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate"});
-    db.Execute("INSERT INTO cars (plate) VALUES (?)",
-               lang::ScriptValue::List({lang::ScriptValue("A")}));
-    db.Execute("INSERT INTO cars (plate) VALUES (?)",
-               lang::ScriptValue::List({lang::ScriptValue("B")}));
+    db.CreateTable("cars", std::vector<std::string>{"plate"});
+    db.Insert("cars", {{"plate", lang::ScriptValue("A")}});
+    db.Insert("cars", {{"plate", lang::ScriptValue("B")}});
 
-    db.Execute("DELETE FROM cars WHERE plate = ?",
-               lang::ScriptValue::List({lang::ScriptValue("A")}));
+    auto result = db.Delete("cars", {{"plate", lang::ScriptValue("A")}});
+    EXPECT_EQ(result.AsMap().at("deleted").AsInt(), 1);
 
-    auto result = db.Query("SELECT * FROM cars", lang::ScriptValue::Null());
-    EXPECT_EQ(result.AsList().size(), 1);
+    auto remaining = db.All("cars");
+    EXPECT_EQ(remaining.AsList().size(), 1);
+}
+
+TEST(Database, Update) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
+    db.Insert("cars", {{"plate", lang::ScriptValue("A")}, {"owner", lang::ScriptValue("Alice")}});
+
+    auto result = db.Update("cars",
+                             {{"plate", lang::ScriptValue("A")}},
+                             {{"owner", lang::ScriptValue("Bob")}});
+    EXPECT_EQ(result.AsMap().at("updated").AsInt(), 1);
+
+    auto row = db.FindOne("cars", {{"plate", lang::ScriptValue("A")}});
+    EXPECT_EQ(row.AsMap().at("owner").AsString(), "Bob");
+}
+
+TEST(Database, Count) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
+    db.Insert("cars", {{"plate", lang::ScriptValue("A")}, {"owner", lang::ScriptValue("Alice")}});
+    db.Insert("cars", {{"plate", lang::ScriptValue("B")}, {"owner", lang::ScriptValue("Alice")}});
+    db.Insert("cars", {{"plate", lang::ScriptValue("C")}, {"owner", lang::ScriptValue("Bob")}});
+
+    auto result = db.Count("cars", {{"owner", lang::ScriptValue("Alice")}});
+    EXPECT_EQ(result.AsInt(), 2);
 }
 
 TEST(Database, Reset) {
     components::Database db("db1");
-    db.CreateTable("cars", {"plate"});
-    db.Execute("INSERT INTO cars (plate) VALUES (?)",
-               lang::ScriptValue::List({lang::ScriptValue("A")}));
+    db.CreateTable("cars", std::vector<std::string>{"plate"});
+    db.Insert("cars", {{"plate", lang::ScriptValue("A")}});
     db.Reset();
 
-    auto result = db.Query("SELECT * FROM cars", lang::ScriptValue::Null());
+    auto result = db.All("cars");
     ASSERT_TRUE(result.IsList());
     EXPECT_EQ(result.AsList().size(), 0);  // rows cleared, schema preserved
+}
+
+// --- Schema Validation ---
+
+TEST(Database, InsertUnknownColumn_ReturnsError) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
+
+    auto result = db.Insert("cars", {{"plate", lang::ScriptValue("A")},
+                                      {"color", lang::ScriptValue("red")}});
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST(Database, FindUnknownColumn_ReturnsError) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<std::string>{"plate", "owner"});
+
+    auto result = db.Find("cars", {{"color", lang::ScriptValue("red")}});
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST(Database, InsertNonexistentTable_ReturnsError) {
+    components::Database db("db1");
+    auto result = db.Insert("users", {{"name", lang::ScriptValue("Alice")}});
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST(Database, TypedSchema_ValidInsert) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<components::Column>{
+        {"plate", components::ColumnType::kString},
+        {"year", components::ColumnType::kInt},
+    });
+
+    auto result = db.Insert("cars", {{"plate", lang::ScriptValue("ABC")},
+                                      {"year", lang::ScriptValue(int64_t{2020})}});
+    EXPECT_FALSE(result.IsError());
+}
+
+TEST(Database, TypedSchema_WrongType_ReturnsError) {
+    components::Database db("db1");
+    db.CreateTable("cars", std::vector<components::Column>{
+        {"plate", components::ColumnType::kString},
+        {"year", components::ColumnType::kInt},
+    });
+
+    // year should be int, not string
+    auto result = db.Insert("cars", {{"plate", lang::ScriptValue("ABC")},
+                                      {"year", lang::ScriptValue("twenty")}});
+    EXPECT_TRUE(result.IsError());
+}
+
+TEST(Database, TypedSchema_FloatAcceptsInt) {
+    components::Database db("db1");
+    db.CreateTable("metrics", std::vector<components::Column>{
+        {"value", components::ColumnType::kFloat},
+    });
+
+    // int should promote to float
+    auto result = db.Insert("metrics", {{"value", lang::ScriptValue(int64_t{42})}});
+    EXPECT_FALSE(result.IsError());
 }
 
 // --- Cache ---

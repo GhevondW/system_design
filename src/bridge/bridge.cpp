@@ -86,9 +86,26 @@ void BuildGraphFromJson(engine::SimulationEngine& eng, const json& graph_json) {
                 auto db = std::make_unique<components::Database>(id);
                 if (comp.contains("tables")) {
                     for (const auto& [name, cols_json] : comp["tables"].items()) {
-                        std::vector<std::string> cols;
-                        for (const auto& c : cols_json) cols.push_back(c.get<std::string>());
-                        db->CreateTable(name, cols);
+                        std::vector<components::Column> columns;
+                        for (const auto& c : cols_json) {
+                            if (c.is_string()) {
+                                // Simple format: ["col1", "col2"]
+                                columns.push_back({c.get<std::string>(), components::ColumnType::kAny});
+                            } else if (c.is_object()) {
+                                // Typed format: [{"name": "col1", "type": "string"}, ...]
+                                std::string col_name = c["name"].get<std::string>();
+                                auto col_type = components::ColumnType::kAny;
+                                if (c.contains("type")) {
+                                    std::string type_str = c["type"].get<std::string>();
+                                    if (type_str == "string") col_type = components::ColumnType::kString;
+                                    else if (type_str == "int") col_type = components::ColumnType::kInt;
+                                    else if (type_str == "float") col_type = components::ColumnType::kFloat;
+                                    else if (type_str == "bool") col_type = components::ColumnType::kBool;
+                                }
+                                columns.push_back({col_name, col_type});
+                            }
+                        }
+                        db->CreateTable(name, columns);
                     }
                 }
                 graph.AddComponent(std::move(db));

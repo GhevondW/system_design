@@ -51,11 +51,12 @@
                     <a href="#comp-cache" class="sidebar-link">Cache</a>
                 </div>
                 <div class="sidebar-section">
-                    <div class="sidebar-title">Database Queries</div>
-                    <a href="#sql-select" class="sidebar-link">SELECT</a>
-                    <a href="#sql-insert" class="sidebar-link">INSERT</a>
-                    <a href="#sql-update" class="sidebar-link">UPDATE</a>
-                    <a href="#sql-delete" class="sidebar-link">DELETE</a>
+                    <div class="sidebar-title">Database Operations</div>
+                    <a href="#db-find" class="sidebar-link">Find / FindOne</a>
+                    <a href="#db-insert" class="sidebar-link">Insert</a>
+                    <a href="#db-update" class="sidebar-link">Update</a>
+                    <a href="#db-delete" class="sidebar-link">Delete</a>
+                    <a href="#db-all-count" class="sidebar-link">All / Count</a>
                 </div>
             </nav>
         </aside>
@@ -80,6 +81,7 @@
                 <ol>
                     <li>Go to <a href="workspace.html">Problems</a> and select <strong>Car Registration</strong></li>
                     <li>The graph shows: Client → HTTP Server → Database</li>
+                    <li><strong>Design your schema</strong> — double-click the Database node to define tables and columns</li>
                     <li>Click the server node to open the code editor</li>
                     <li>Implement the <code>handle_register</code> function</li>
                     <li>Click <strong>Run</strong> (or Ctrl+Enter) to test your solution</li>
@@ -307,8 +309,8 @@ return { status: 201, body: { created: true } };</code></pre>
                 <h3>Connected component access</h3>
                 <p>When you connect a Database or Cache to your server in the graph, their APIs become available as variables:</p>
 <pre><code>// If server is connected to a Database (alias: "db"):
-let rows = db.query("SELECT * FROM users", []);
-db.execute("INSERT INTO users (name) VALUES (?)", ["Alice"]);
+let car = db.FindOne("cars", { plate: "ABC123" });
+db.Insert("cars", { plate: "ABC123", owner: "Alice" });
 
 // If server is connected to a Cache (alias: "cache"):
 let val = cache.get("key");
@@ -318,15 +320,20 @@ cache.set("key", "value", 3600);</code></pre>
             <!-- Component: Database -->
             <section id="comp-database">
                 <h2>Database Component</h2>
-                <p>In-memory relational storage with SQL-like queries.</p>
+                <p>In-memory relational database with a functional API. No SQL — just simple function calls with maps.</p>
                 <table>
                     <thead><tr><th>Method</th><th>Description</th><th>Returns</th></tr></thead>
                     <tbody>
-                        <tr><td><code>db.query(sql, params)</code></td><td>Query rows</td><td>List of maps</td></tr>
-                        <tr><td><code>db.execute(sql, params)</code></td><td>Insert/Update/Delete</td><td><code>{ affected_rows: N }</code></td></tr>
-                        <tr><td><code>db.createTable(name, columns)</code></td><td>Create a table</td><td>null</td></tr>
+                        <tr><td><code>db.FindOne(table, filter)</code></td><td>Find first matching row</td><td>Map or null</td></tr>
+                        <tr><td><code>db.Find(table, filter)</code></td><td>Find all matching rows</td><td>List of maps</td></tr>
+                        <tr><td><code>db.Insert(table, row)</code></td><td>Insert a new row</td><td><code>{ inserted: true }</code></td></tr>
+                        <tr><td><code>db.Update(table, filter, updates)</code></td><td>Update matching rows</td><td><code>{ updated: N }</code></td></tr>
+                        <tr><td><code>db.Delete(table, filter)</code></td><td>Delete matching rows</td><td><code>{ deleted: N }</code></td></tr>
+                        <tr><td><code>db.All(table)</code></td><td>Get all rows</td><td>List of maps</td></tr>
+                        <tr><td><code>db.Count(table, filter)</code></td><td>Count matching rows</td><td>Number</td></tr>
                     </tbody>
                 </table>
+                <p>The <code>filter</code> argument is a map of column-value pairs. All must match (AND logic). An empty filter <code>{}</code> matches all rows.</p>
             </section>
 
             <!-- Component: Cache -->
@@ -344,44 +351,62 @@ cache.set("key", "value", 3600);</code></pre>
                 </table>
             </section>
 
-            <!-- SQL Reference -->
-            <section id="sql-select">
-                <h2>SELECT</h2>
-<pre><code>// All rows
-let rows = db.query("SELECT * FROM cars", []);
+            <!-- Database Operations -->
+            <section id="db-find">
+                <h2>Find / FindOne</h2>
+<pre><code>// Find first matching row (or null if not found)
+let car = db.FindOne("cars", { plate: "ABC123" });
+// Returns: { plate: "ABC123", owner: "Alice" } or null
 
-// With WHERE (parameterized)
-let rows = db.query("SELECT * FROM cars WHERE plate = ?", ["ABC123"]);
+// Find all matching rows
+let alice_cars = db.Find("cars", { owner: "Alice" });
+// Returns: [ { plate: "ABC123", owner: "Alice" }, ... ]
 
-// Result: list of maps
-// [ { plate: "ABC123", owner: "Alice" } ]</code></pre>
+// Empty filter matches all rows
+let all = db.Find("cars", {});</code></pre>
             </section>
 
-            <section id="sql-insert">
-                <h2>INSERT</h2>
-<pre><code>db.execute(
-    "INSERT INTO cars (plate, owner) VALUES (?, ?)",
-    ["ABC123", "Alice"]
-);
-// Returns: { affected_rows: 1 }</code></pre>
+            <section id="db-insert">
+                <h2>Insert</h2>
+<pre><code>db.Insert("cars", { plate: "ABC123", owner: "Alice" });
+// Returns: { inserted: true }
+
+// Insert with any columns your table has
+db.Insert("users", { name: "Bob", email: "bob@test.com", age: 30 });</code></pre>
             </section>
 
-            <section id="sql-update">
-                <h2>UPDATE</h2>
-<pre><code>db.execute(
-    "UPDATE cars SET owner = ? WHERE plate = ?",
-    ["Bob", "ABC123"]
-);
-// Returns: { affected_rows: 1 }</code></pre>
+            <section id="db-update">
+                <h2>Update</h2>
+<pre><code>// Update matching rows: (table, filter, updates)
+db.Update("cars", { plate: "ABC123" }, { owner: "Bob" });
+// Returns: { updated: 1 }
+
+// Update multiple rows at once
+db.Update("users", { role: "admin" }, { verified: true });
+// Returns: { updated: N }</code></pre>
             </section>
 
-            <section id="sql-delete">
-                <h2>DELETE</h2>
-<pre><code>db.execute(
-    "DELETE FROM cars WHERE plate = ?",
-    ["ABC123"]
-);
-// Returns: { affected_rows: 1 }</code></pre>
+            <section id="db-delete">
+                <h2>Delete</h2>
+<pre><code>db.Delete("cars", { plate: "ABC123" });
+// Returns: { deleted: 1 }
+
+// Delete all matching rows
+db.Delete("sessions", { expired: true });</code></pre>
+            </section>
+
+            <section id="db-all-count">
+                <h2>All / Count</h2>
+<pre><code>// Get all rows in a table
+let cars = db.All("cars");
+// Returns: [ { plate: "ABC123", owner: "Alice" }, ... ]
+
+// Count rows matching a filter
+let n = db.Count("cars", { owner: "Alice" });
+// Returns: 2
+
+// Count all rows (empty filter)
+let total = db.Count("cars", {});</code></pre>
             </section>
         </main>
     </div>

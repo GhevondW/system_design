@@ -24,15 +24,15 @@ engine::SimulationEngine SetupEngine() {
     sim.SetGraph(std::move(graph));
 
     auto* db = dynamic_cast<components::Database*>(sim.GetGraph().GetComponent("db"));
-    db->CreateTable("cars", {"plate", "owner"});
+    db->CreateTable("cars", std::vector<std::string>{"plate", "owner"});
 
     sim.LoadCode("server", R"SYSLANG(
         fn handle_register(req) {
-            let existing = db.query("SELECT * FROM cars WHERE plate = ?", [req.body.plate]);
-            if (existing.size() > 0) {
+            let existing = db.FindOne("cars", { plate: req.body.plate });
+            if (existing != null) {
                 return { status: 409, body: "Already registered" };
             }
-            db.execute("INSERT INTO cars (plate, owner) VALUES (?, ?)", [req.body.plate, req.body.owner]);
+            db.Insert("cars", { plate: req.body.plate, owner: req.body.owner });
             return { status: 201, body: { plate: req.body.plate, registered: true } };
         }
     )SYSLANG");

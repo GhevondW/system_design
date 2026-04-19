@@ -25,7 +25,7 @@ engine::SimulationEngine BuildAsyncEngine() {
     sim.SetGraph(std::move(graph));
 
     auto* db = dynamic_cast<components::Database*>(sim.GetGraph().GetComponent("db"));
-    db->CreateTable("cars", {"plate", "owner"});
+    db->CreateTable("cars", std::vector<std::string>{"plate", "owner"});
 
     return sim;
 }
@@ -35,11 +35,11 @@ TEST(FiberRuntime, AsyncMode_BasicRequestResponse) {
 
     sim.LoadCode("server", R"SYSLANG(
         fn handle_register(req) {
-            let existing = db.query("SELECT * FROM cars WHERE plate = ?", [req.body.plate]);
-            if (existing.size() > 0) {
+            let existing = db.FindOne("cars", { plate: req.body.plate });
+            if (existing != null) {
                 return { status: 409, body: "Already registered" };
             }
-            db.execute("INSERT INTO cars (plate, owner) VALUES (?, ?)", [req.body.plate, req.body.owner]);
+            db.Insert("cars", { plate: req.body.plate, owner: req.body.owner });
             return { status: 201, body: { plate: req.body.plate, registered: true } };
         }
     )SYSLANG");
@@ -68,8 +68,7 @@ TEST(FiberRuntime, AsyncMode_BasicRequestResponse) {
     EXPECT_EQ(client->GetResponses()[0].status, 201);
 
     auto* db = dynamic_cast<components::Database*>(sim.GetGraph().GetComponent("db"));
-    auto rows = db->Query("SELECT * FROM cars WHERE plate = ?",
-                          lang::ScriptValue::List({lang::ScriptValue("ABC123")}));
+    auto rows = db->Find("cars", {{"plate", lang::ScriptValue("ABC123")}});
     ASSERT_TRUE(rows.IsList());
     EXPECT_EQ(rows.AsList().size(), 1);
 }
@@ -126,11 +125,11 @@ TEST(FiberRuntime, AsyncMode_SyncModeStillWorks) {
     sim.SetGraph(std::move(graph));
 
     auto* db = dynamic_cast<components::Database*>(sim.GetGraph().GetComponent("db"));
-    db->CreateTable("items", {"name"});
+    db->CreateTable("items", std::vector<std::string>{"name"});
 
     sim.LoadCode("server", R"SYSLANG(
         fn handle(req) {
-            db.execute("INSERT INTO items (name) VALUES (?)", [req.body.name]);
+            db.Insert("items", { name: req.body.name });
             return { status: 200, body: "ok" };
         }
     )SYSLANG");

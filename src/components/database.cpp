@@ -1,7 +1,6 @@
 #include "components/database.h"
 
 #include <algorithm>
-#include <sstream>
 
 namespace components {
 
@@ -9,197 +8,248 @@ Database::Database(engine::ComponentId id) : Component(std::move(id), engine::Co
 
 std::vector<engine::Event> Database::HandleEvent(const engine::Event& /*event*/,
                                                   engine::Timestamp /*current_time*/) {
-    // Database responds synchronously in the interpreter via injected API
     return {};
 }
 
 lang::ScriptValue Database::GetApiObject() {
-    return lang::ScriptValue(lang::ScriptMap{});  // placeholder, methods are injected separately
+    return lang::ScriptValue(lang::ScriptMap{});
 }
 
 void Database::Reset() {
-    // Clear row data but preserve table schemas
     for (auto& [name, table] : tables_) {
         table.rows.clear();
     }
 }
 
-void Database::CreateTable(const std::string& name, const std::vector<std::string>& columns) {
+void Database::CreateTable(const std::string& name, const std::vector<Column>& columns) {
     tables_[name] = Table{columns, {}};
 }
 
-// Simple SQL parser for: SELECT, INSERT, UPDATE, DELETE
-lang::ScriptValue Database::Query(const std::string& sql, const lang::ScriptValue& params) {
-    // Very basic SQL parsing
-    std::istringstream iss(sql);
-    std::string cmd;
-    iss >> cmd;
-
-    // Normalize to uppercase
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
-
-    if (cmd == "SELECT") {
-        // SELECT * FROM table WHERE col = ?
-        std::string star, from_kw, table_name;
-        iss >> star >> from_kw >> table_name;
-
-        auto table_it = tables_.find(table_name);
-        if (table_it == tables_.end()) {
-            return lang::ScriptValue::Error("Table not found: " + table_name);
-        }
-
-        const auto& table = table_it->second;
-
-        // Check for WHERE clause
-        std::string where_kw;
-        if (iss >> where_kw) {
-            std::transform(where_kw.begin(), where_kw.end(), where_kw.begin(), ::toupper);
-            if (where_kw == "WHERE") {
-                std::string col, eq;
-                iss >> col >> eq;  // col = ?
-
-                // Get the parameter value
-                lang::ScriptValue param_val;
-                if (params.IsList() && !params.AsList().empty()) {
-                    param_val = params.AsList()[0];
-                }
-
-                lang::ScriptList results;
-                for (const auto& row : table.rows) {
-                    auto it = row.find(col);
-                    if (it != row.end() && it->second.Equals(param_val)) {
-                        results.push_back(lang::ScriptValue(lang::ScriptMap(row)));
-                    }
-                }
-                return lang::ScriptValue::List(std::move(results));
-            }
-        }
-
-        // No WHERE — return all rows
-        lang::ScriptList results;
-        for (const auto& row : table.rows) {
-            results.push_back(lang::ScriptValue(lang::ScriptMap(row)));
-        }
-        return lang::ScriptValue::List(std::move(results));
+void Database::CreateTable(const std::string& name, const std::vector<std::string>& column_names) {
+    std::vector<Column> columns;
+    columns.reserve(column_names.size());
+    for (const auto& col_name : column_names) {
+        columns.push_back(Column{col_name, ColumnType::kAny});
     }
-
-    return lang::ScriptValue::Error("Unsupported query: " + sql);
+    tables_[name] = Table{std::move(columns), {}};
 }
 
-lang::ScriptValue Database::Execute(const std::string& sql, const lang::ScriptValue& params) {
-    std::istringstream iss(sql);
-    std::string cmd;
-    iss >> cmd;
-    std::transform(cmd.begin(), cmd.end(), cmd.begin(), ::toupper);
+// --- Schema introspection ---
 
-    if (cmd == "INSERT") {
-        // INSERT INTO table (col1, col2) VALUES (?, ?)
-        std::string into_kw, table_name;
-        iss >> into_kw >> table_name;
+bool Database::HasTable(const std::string& name) const {
+    return tables_.contains(name);
+}
 
-        auto table_it = tables_.find(table_name);
-        if (table_it == tables_.end()) {
-            return lang::ScriptValue::Error("Table not found: " + table_name);
-        }
+const std::vector<Column>* Database::GetSchema(const std::string& table) const {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) return nullptr;
+    return &it->second.columns;
+}
 
-        auto& table = table_it->second;
+// --- CRUD Operations ---
 
-        // Parse column list from SQL: (col1, col2)
-        std::string rest;
-        std::getline(iss, rest);
-        std::vector<std::string> columns;
-
-        auto paren_start = rest.find('(');
-        auto paren_end = rest.find(')');
-        if (paren_start != std::string::npos && paren_end != std::string::npos) {
-            std::string col_list = rest.substr(paren_start + 1, paren_end - paren_start - 1);
-            std::istringstream col_stream(col_list);
-            std::string col;
-            while (std::getline(col_stream, col, ',')) {
-                // Trim whitespace
-                col.erase(0, col.find_first_not_of(" \t"));
-                col.erase(col.find_last_not_of(" \t") + 1);
-                if (!col.empty()) columns.push_back(col);
-            }
-        }
-
-        // Build row from params
-        lang::ScriptMap row;
-        if (params.IsList()) {
-            const auto& vals = params.AsList();
-            for (size_t i = 0; i < columns.size() && i < vals.size(); ++i) {
-                row[columns[i]] = vals[i];
-            }
-        }
-
-        table.rows.push_back(std::move(row));
-        return lang::ScriptValue(lang::ScriptMap{{"affected_rows", lang::ScriptValue(1)}});
+lang::ScriptValue Database::Insert(const std::string& table, const lang::ScriptMap& row) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
     }
 
-    if (cmd == "DELETE") {
-        // DELETE FROM table WHERE col = ?
-        std::string from_kw, table_name, where_kw, col, eq;
-        iss >> from_kw >> table_name >> where_kw >> col >> eq;
+    // Validate all provided columns exist in schema and types match
+    auto err = ValidateColumns(it->second, row, "Insert");
+    if (err.IsError()) return err;
 
-        auto table_it = tables_.find(table_name);
-        if (table_it == tables_.end()) {
-            return lang::ScriptValue::Error("Table not found: " + table_name);
-        }
+    it->second.rows.push_back(row);
+    return lang::ScriptValue(lang::ScriptMap{{"inserted", lang::ScriptValue(true)}});
+}
 
-        auto& table = table_it->second;
-
-        lang::ScriptValue param_val;
-        if (params.IsList() && !params.AsList().empty()) {
-            param_val = params.AsList()[0];
-        }
-
-        auto original_size = static_cast<int64_t>(table.rows.size());
-        table.rows.erase(
-            std::remove_if(table.rows.begin(), table.rows.end(),
-                           [&](const lang::ScriptMap& row) {
-                               auto it = row.find(col);
-                               return it != row.end() && it->second.Equals(param_val);
-                           }),
-            table.rows.end());
-
-        auto deleted = original_size - static_cast<int64_t>(table.rows.size());
-        return lang::ScriptValue(
-            lang::ScriptMap{{"affected_rows", lang::ScriptValue(deleted)}});
+lang::ScriptValue Database::Find(const std::string& table, const lang::ScriptMap& filter) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
     }
 
-    if (cmd == "UPDATE") {
-        // UPDATE table SET col = ? WHERE col = ?
-        std::string table_name, set_kw, set_col, eq1, q1, where_kw, where_col, eq2;
-        iss >> table_name >> set_kw >> set_col >> eq1 >> q1 >> where_kw >> where_col >> eq2;
+    auto err = ValidateFilterColumns(it->second, filter);
+    if (err.IsError()) return err;
 
-        auto table_it = tables_.find(table_name);
-        if (table_it == tables_.end()) {
-            return lang::ScriptValue::Error("Table not found: " + table_name);
+    lang::ScriptList results;
+    for (const auto& row : it->second.rows) {
+        if (MatchesFilter(row, filter)) {
+            results.push_back(lang::ScriptValue(lang::ScriptMap(row)));
         }
+    }
+    return lang::ScriptValue::List(std::move(results));
+}
 
-        auto& table = table_it->second;
-        // Remove trailing comma from set_col if present
-        if (!set_col.empty() && set_col.back() == ',') set_col.pop_back();
+lang::ScriptValue Database::FindOne(const std::string& table, const lang::ScriptMap& filter) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
+    }
 
-        lang::ScriptValue set_val, where_val;
-        if (params.IsList() && params.AsList().size() >= 2) {
-            set_val = params.AsList()[0];
-            where_val = params.AsList()[1];
+    auto err = ValidateFilterColumns(it->second, filter);
+    if (err.IsError()) return err;
+
+    for (const auto& row : it->second.rows) {
+        if (MatchesFilter(row, filter)) {
+            return lang::ScriptValue(lang::ScriptMap(row));
         }
+    }
+    return lang::ScriptValue::Null();
+}
 
-        int64_t count = 0;
-        for (auto& row : table.rows) {
-            auto it = row.find(where_col);
-            if (it != row.end() && it->second.Equals(where_val)) {
-                row[set_col] = set_val;
-                count++;
+lang::ScriptValue Database::Update(const std::string& table, const lang::ScriptMap& filter,
+                                    const lang::ScriptMap& updates) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
+    }
+
+    auto err = ValidateFilterColumns(it->second, filter);
+    if (err.IsError()) return err;
+
+    err = ValidateColumns(it->second, updates, "Update");
+    if (err.IsError()) return err;
+
+    int64_t count = 0;
+    for (auto& row : it->second.rows) {
+        if (MatchesFilter(row, filter)) {
+            for (const auto& [key, val] : updates) {
+                row[key] = val;
             }
+            count++;
         }
+    }
+    return lang::ScriptValue(lang::ScriptMap{{"updated", lang::ScriptValue(count)}});
+}
 
-        return lang::ScriptValue(lang::ScriptMap{{"affected_rows", lang::ScriptValue(count)}});
+lang::ScriptValue Database::Delete(const std::string& table, const lang::ScriptMap& filter) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
     }
 
-    return lang::ScriptValue::Error("Unsupported statement: " + sql);
+    auto err = ValidateFilterColumns(it->second, filter);
+    if (err.IsError()) return err;
+
+    auto& rows = it->second.rows;
+    auto original_size = static_cast<int64_t>(rows.size());
+    rows.erase(
+        std::remove_if(rows.begin(), rows.end(),
+                       [&](const lang::ScriptMap& row) { return MatchesFilter(row, filter); }),
+        rows.end());
+    auto deleted = original_size - static_cast<int64_t>(rows.size());
+    return lang::ScriptValue(lang::ScriptMap{{"deleted", lang::ScriptValue(deleted)}});
+}
+
+lang::ScriptValue Database::All(const std::string& table) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
+    }
+
+    lang::ScriptList results;
+    for (const auto& row : it->second.rows) {
+        results.push_back(lang::ScriptValue(lang::ScriptMap(row)));
+    }
+    return lang::ScriptValue::List(std::move(results));
+}
+
+lang::ScriptValue Database::Count(const std::string& table, const lang::ScriptMap& filter) {
+    auto it = tables_.find(table);
+    if (it == tables_.end()) {
+        return lang::ScriptValue::Error("Table not found: " + table);
+    }
+
+    auto err = ValidateFilterColumns(it->second, filter);
+    if (err.IsError()) return err;
+
+    int64_t count = 0;
+    for (const auto& row : it->second.rows) {
+        if (MatchesFilter(row, filter)) {
+            count++;
+        }
+    }
+    return lang::ScriptValue(count);
+}
+
+// --- Private: Validation ---
+
+lang::ScriptValue Database::ValidateColumns(const Table& table, const lang::ScriptMap& data,
+                                             const std::string& operation) const {
+    for (const auto& [key, val] : data) {
+        // Check column exists in schema
+        auto col_it = std::find_if(table.columns.begin(), table.columns.end(),
+                                    [&](const Column& c) { return c.name == key; });
+        if (col_it == table.columns.end()) {
+            std::string valid_cols;
+            for (size_t i = 0; i < table.columns.size(); ++i) {
+                if (i > 0) valid_cols += ", ";
+                valid_cols += table.columns[i].name;
+            }
+            return lang::ScriptValue::Error(
+                operation + ": unknown column '" + key + "'. Valid columns: [" + valid_cols + "]");
+        }
+
+        // Validate type if not kAny
+        if (col_it->type != ColumnType::kAny && !ValidateType(col_it->type, val)) {
+            return lang::ScriptValue::Error(
+                operation + ": column '" + key + "' expects " + TypeName(col_it->type) +
+                " but got " + std::string(val.TypeName()));
+        }
+    }
+    return lang::ScriptValue::Null();  // no error
+}
+
+lang::ScriptValue Database::ValidateFilterColumns(const Table& table,
+                                                   const lang::ScriptMap& filter) const {
+    for (const auto& [key, val] : filter) {
+        auto col_it = std::find_if(table.columns.begin(), table.columns.end(),
+                                    [&](const Column& c) { return c.name == key; });
+        if (col_it == table.columns.end()) {
+            std::string valid_cols;
+            for (size_t i = 0; i < table.columns.size(); ++i) {
+                if (i > 0) valid_cols += ", ";
+                valid_cols += table.columns[i].name;
+            }
+            return lang::ScriptValue::Error(
+                "Filter: unknown column '" + key + "'. Valid columns: [" + valid_cols + "]");
+        }
+    }
+    return lang::ScriptValue::Null();  // no error
+}
+
+bool Database::ValidateType(ColumnType expected, const lang::ScriptValue& value) const {
+    switch (expected) {
+        case ColumnType::kString: return value.IsString();
+        case ColumnType::kInt: return value.IsInt();
+        case ColumnType::kFloat: return value.IsFloat() || value.IsInt();  // int promotes to float
+        case ColumnType::kBool: return value.IsBool();
+        case ColumnType::kAny: return true;
+    }
+    return true;
+}
+
+std::string Database::TypeName(ColumnType type) const {
+    switch (type) {
+        case ColumnType::kString: return "string";
+        case ColumnType::kInt: return "int";
+        case ColumnType::kFloat: return "float";
+        case ColumnType::kBool: return "bool";
+        case ColumnType::kAny: return "any";
+    }
+    return "unknown";
+}
+
+// --- Private: Filtering ---
+
+bool Database::MatchesFilter(const lang::ScriptMap& row, const lang::ScriptMap& filter) const {
+    for (const auto& [key, val] : filter) {
+        auto it = row.find(key);
+        if (it == row.end() || !it->second.Equals(val)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace components

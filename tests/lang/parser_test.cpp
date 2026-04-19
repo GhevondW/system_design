@@ -362,8 +362,8 @@ TEST(Parser, LogicalOr) {
 TEST(Parser, FullFunctionWithDbQuery) {
     auto stmts = ParseSource(R"(
         fn handle_register(req) {
-            let existing = db.query("SELECT * FROM cars WHERE plate = ?", [req.body.plate]);
-            if (existing.size() > 0) {
+            let existing = db.FindOne("cars", { plate: req.body.plate });
+            if (existing != null) {
                 return { status: 409, body: "Already registered" };
             }
             return { status: 201, body: { plate: req.body.plate } };

@@ -80,7 +80,7 @@ TestResult TestRunner::RunTest(const TestCase& test) {
         for (const auto& [id, comp] : engine_.GetGraph().GetComponents()) {
             if (comp->GetType() == ComponentType::kDatabase) {
                 auto* db = dynamic_cast<components::Database*>(comp.get());
-                auto rows = db->Query("SELECT * FROM " + table_name, lang::ScriptValue::Null());
+                auto rows = db->All(table_name);
                 if (rows.IsList()) {
                     auto actual_count = static_cast<int>(rows.AsList().size());
                     if (actual_count != expected_count) {

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -9,7 +8,16 @@
 
 namespace components {
 
-// In-memory simulated database with basic SQL-like operations
+// Column type for schema validation
+enum class ColumnType { kAny, kString, kInt, kFloat, kBool };
+
+struct Column {
+    std::string name;
+    ColumnType type = ColumnType::kAny;
+};
+
+// In-memory simulated relational database with schema validation.
+// Operations validate against the defined schema and return errors on violations.
 class Database : public engine::Component {
 public:
     explicit Database(engine::ComponentId id);
@@ -19,16 +27,36 @@ public:
     lang::ScriptValue GetApiObject() override;
     void Reset() override;
 
-    // Direct API (used by the interpreter via injected functions)
-    lang::ScriptValue Query(const std::string& sql, const lang::ScriptValue& params);
-    lang::ScriptValue Execute(const std::string& sql, const lang::ScriptValue& params);
-    void CreateTable(const std::string& name, const std::vector<std::string>& columns);
+    // Schema definition
+    void CreateTable(const std::string& name, const std::vector<Column>& columns);
+    void CreateTable(const std::string& name, const std::vector<std::string>& column_names);
+
+    // CRUD — functional API with schema validation
+    lang::ScriptValue Insert(const std::string& table, const lang::ScriptMap& row);
+    lang::ScriptValue Find(const std::string& table, const lang::ScriptMap& filter);
+    lang::ScriptValue FindOne(const std::string& table, const lang::ScriptMap& filter);
+    lang::ScriptValue Update(const std::string& table, const lang::ScriptMap& filter,
+                             const lang::ScriptMap& updates);
+    lang::ScriptValue Delete(const std::string& table, const lang::ScriptMap& filter);
+    lang::ScriptValue All(const std::string& table);
+    lang::ScriptValue Count(const std::string& table, const lang::ScriptMap& filter);
+
+    // Schema introspection
+    bool HasTable(const std::string& name) const;
+    const std::vector<Column>* GetSchema(const std::string& table) const;
 
 private:
     struct Table {
-        std::vector<std::string> columns;
+        std::vector<Column> columns;
         std::vector<lang::ScriptMap> rows;
     };
+
+    bool MatchesFilter(const lang::ScriptMap& row, const lang::ScriptMap& filter) const;
+    lang::ScriptValue ValidateColumns(const Table& table, const lang::ScriptMap& data,
+                                       const std::string& operation) const;
+    lang::ScriptValue ValidateFilterColumns(const Table& table, const lang::ScriptMap& filter) const;
+    bool ValidateType(ColumnType expected, const lang::ScriptValue& value) const;
+    std::string TypeName(ColumnType type) const;
 
     std::unordered_map<std::string, Table> tables_;
 };
