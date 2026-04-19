@@ -44,7 +44,7 @@ lang::ScriptValue HttpServer::GetApiObject() {
 }
 
 void HttpServer::Reset() {
-    routes_.clear();
+    // Preserve routes — they're part of the problem definition, not runtime state
 }
 
 void HttpServer::AddRoute(const std::string& method, const std::string& path,

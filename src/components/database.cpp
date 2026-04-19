@@ -18,7 +18,10 @@ lang::ScriptValue Database::GetApiObject() {
 }
 
 void Database::Reset() {
-    tables_.clear();
+    // Clear row data but preserve table schemas
+    for (auto& [name, table] : tables_) {
+        table.rows.clear();
+    }
 }
 
 void Database::CreateTable(const std::string& name, const std::vector<std::string>& columns) {

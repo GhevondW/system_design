@@ -83,7 +83,8 @@ TEST(Database, Reset) {
     db.Reset();
 
     auto result = db.Query("SELECT * FROM cars", lang::ScriptValue::Null());
-    EXPECT_TRUE(result.IsError());  // table doesn't exist after reset
+    ASSERT_TRUE(result.IsList());
+    EXPECT_EQ(result.AsList().size(), 0);  // rows cleared, schema preserved
 }
 
 // --- Cache ---

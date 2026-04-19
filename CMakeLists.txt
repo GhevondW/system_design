@@ -53,6 +53,7 @@ add_library(systemforge_engine STATIC
     src/components/database.cpp
     src/components/cache.cpp
     src/engine/simulation_engine.cpp
+    src/engine/test_runner.cpp
 )
 
 target_include_directories(systemforge_engine PUBLIC
@@ -117,6 +118,7 @@ else()
         tests/engine/event_queue_test.cpp
         tests/components/component_test.cpp
         tests/engine/simulation_engine_test.cpp
+        tests/engine/test_runner_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
