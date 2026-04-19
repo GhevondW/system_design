@@ -53,6 +53,7 @@ services:
       source /opt/emsdk/emsdk_env.sh &&
       emcmake cmake -B build/wasm -G Ninja -DCMAKE_BUILD_TYPE=$${BUILD_TYPE} &&
       cmake --build build/wasm &&
+      cp build/wasm/systemforge.wasm web/ 2>/dev/null || true &&
       echo '' &&
       echo 'SystemForge built successfully!' &&
       echo '' &&

@@ -12,7 +12,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # --- Compiler Warnings (per 08-code-standards.md) ---
-add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+if(EMSCRIPTEN)
+    # Emscripten system headers have issues with -Werror and -Wpedantic
+    add_compile_options(-Wall -Wextra)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
 
 # --- Third-party Dependencies ---
 
@@ -69,8 +74,9 @@ target_link_libraries(systemforge_engine PUBLIC
 
 if(EMSCRIPTEN)
     # --- WASM Target ---
+    # bridge.cpp is already in systemforge_engine, just need to export it
     add_executable(systemforge_wasm
-        src/bridge/bridge.cpp
+        src/bridge/wasm_main.cpp
     )
 
     target_link_libraries(systemforge_wasm PRIVATE
@@ -78,16 +84,19 @@ if(EMSCRIPTEN)
     )
 
     target_link_options(systemforge_wasm PRIVATE
+        "-sEXPORTED_FUNCTIONS=['_engine_create','_engine_destroy','_engine_load_graph','_engine_load_code','_engine_run_all','_engine_step_event','_engine_reset','_engine_get_state','_engine_get_logs','_engine_free_string','_engine_version','_malloc','_free']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','UTF8ToString','stringToNewUTF8']"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sEXPORT_ES6=0"
         "-sMODULARIZE=1"
         "-sEXPORT_NAME='SystemForge'"
+        "-sNO_EXIT_RUNTIME=1"
     )
 
     set_target_properties(systemforge_wasm PROPERTIES
         OUTPUT_NAME "systemforge"
         SUFFIX ".js"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/web"
     )
 else()
     # --- Native Target ---

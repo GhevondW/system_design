@@ -201,34 +201,61 @@ class App {
             return;
         }
         this._log('info', 'Running tests...');
-        const results = this._runTestsLocally();
-        this._renderTestResults(results);
-    }
 
-    _runTestsLocally() {
-        const problem = this.currentProblem;
-        const serverNode = this.graphEditor.nodes.find(n => n.type === 'HttpServer');
-        const code = serverNode ? this.codeEditor.getCode(serverNode.id) : '';
-        const hasImpl = code && !code.includes('Not implemented');
+        try {
+            // Reset the WASM engine and load the current graph + code
+            this.bridge.destroy();
+            await this.bridge.init();
 
-        const results = {
-            total: problem.testCases.length,
-            passed: 0,
-            failed: 0,
-            results: [],
-        };
+            if (!this.bridge.isWasmLoaded()) {
+                this._log('error', 'WASM not loaded — run: ./dev.sh serve');
+                this._renderTestResults(this.bridge.runAll(this.currentProblem.testCases));
+                return;
+            }
 
-        for (const tc of problem.testCases) {
-            const r = {
-                name: tc.name,
-                passed: hasImpl,
-                error: hasImpl ? '' : 'Handler returns "Not implemented"',
-            };
-            if (r.passed) results.passed++; else results.failed++;
-            results.results.push(r);
+            // 1. Load the graph from the editor
+            const graphJson = this.graphEditor.getGraphJson();
+            const loadResult = this.bridge.loadGraph(graphJson);
+            if (loadResult.error) {
+                this._log('error', 'Graph load failed: ' + loadResult.error);
+                return;
+            }
+
+            // 2. Load user code for each codable component
+            for (const node of this.graphEditor.nodes) {
+                if (node.type === 'HttpServer' || node.type === 'Worker') {
+                    const code = this.codeEditor.getCode(node.id);
+                    if (code) {
+                        const codeResult = this.bridge.loadCode(node.id, code);
+                        if (codeResult.error) {
+                            this._log('error', `Code error in ${node.id}: ${codeResult.error}`);
+                            this._renderTestResults({
+                                total: this.currentProblem.testCases.length,
+                                passed: 0, failed: this.currentProblem.testCases.length,
+                                all_passed: false,
+                                results: this.currentProblem.testCases.map(tc => ({
+                                    name: tc.name, passed: false,
+                                    error: `Compile error: ${codeResult.error}`
+                                }))
+                            });
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // 3. Run test cases through the engine
+            const results = this.bridge.runAll(this.currentProblem.testCases);
+            this._renderTestResults(results);
+
+            // 4. Show logs
+            const logs = this.bridge.getLogs();
+            for (const log of logs) {
+                this._log('info', log);
+            }
+        } catch (e) {
+            this._log('error', 'Test execution failed: ' + e.message);
         }
-        results.all_passed = results.failed === 0;
-        return results;
     }
 
     _stepEvent() {

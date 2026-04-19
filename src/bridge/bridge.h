@@ -7,8 +7,11 @@
 extern "C" {
 #endif
 
+// EMSCRIPTEN_KEEPALIVE marks functions for export in WASM.
+// We define it directly to avoid including em_asm.h which has
+// C++23 incompatible template specializations.
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
+#define EMSCRIPTEN_KEEPALIVE __attribute__((used, visibility("default")))
 #else
 #define EMSCRIPTEN_KEEPALIVE
 #endif

@@ -36,8 +36,7 @@ void FiberRuntime::RunAll() {
     // Run them all as fibers in a Cortex scheduler.
     // Each handler can call tf::Yield() to simulate latency.
     // All fibers run cooperatively until completion.
-    auto* self = this;
-    tf::Scheduler::Run([&handlers, self]() {
+    tf::Scheduler::Run([&handlers]() {
         std::vector<tf::Future<void>> futures;
         futures.reserve(handlers.size());
         for (auto& h : handlers) {
