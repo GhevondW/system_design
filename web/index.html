@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SystemForge — LeetCode for System Design</title>
+    <title>SystemForge</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -32,41 +33,10 @@
     </header>
 
     <main class="workspace">
-        <!-- Left: Graph Editor -->
-        <div class="panel panel-graph" id="graph-panel">
-            <div class="panel-header">
-                <span>Architecture</span>
-                <div class="component-palette">
-                    <button class="palette-btn" data-type="Client" title="Client">
-                        <i class="fas fa-user"></i>
-                    </button>
-                    <button class="palette-btn" data-type="HttpServer" title="HTTP Server">
-                        <i class="fas fa-server"></i>
-                    </button>
-                    <button class="palette-btn" data-type="Database" title="Database">
-                        <i class="fas fa-database"></i>
-                    </button>
-                    <button class="palette-btn" data-type="Cache" title="Cache">
-                        <i class="fas fa-bolt"></i>
-                    </button>
-                </div>
-            </div>
-            <canvas id="graph-canvas"></canvas>
-        </div>
-
-        <!-- Center: Code Editor -->
-        <div class="panel panel-code" id="code-panel">
-            <div class="panel-header">
-                <span id="code-title">Code</span>
-                <div class="code-tabs" id="code-tabs"></div>
-            </div>
-            <div id="editor-container"></div>
-        </div>
-
-        <!-- Right: Info Panel -->
-        <div class="panel panel-info" id="info-panel">
-            <!-- Problem Description -->
-            <div class="sub-panel" id="description-panel">
+        <!-- Top row: Description | Graph | Code -->
+        <div class="workspace-top">
+            <!-- Left: Problem Description -->
+            <div class="panel panel-description" id="description-panel">
                 <div class="panel-header"><span>Problem</span></div>
                 <div class="panel-content" id="problem-description">
                     <div class="placeholder-text">
@@ -76,8 +46,48 @@
                 </div>
             </div>
 
-            <!-- Test Results -->
-            <div class="sub-panel" id="results-panel">
+            <div class="resize-handle-v" id="resize-left"></div>
+
+            <!-- Center: Graph Editor -->
+            <div class="panel panel-graph" id="graph-panel">
+                <div class="panel-header">
+                    <span>Architecture</span>
+                    <div class="component-palette">
+                        <button class="palette-btn" data-type="Client" title="Add Client">
+                            <i class="fas fa-user"></i>
+                        </button>
+                        <button class="palette-btn" data-type="HttpServer" title="Add HTTP Server">
+                            <i class="fas fa-server"></i>
+                        </button>
+                        <button class="palette-btn" data-type="Database" title="Add Database">
+                            <i class="fas fa-database"></i>
+                        </button>
+                        <button class="palette-btn" data-type="Cache" title="Add Cache">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                    </div>
+                </div>
+                <canvas id="graph-canvas" tabindex="0"></canvas>
+            </div>
+
+            <div class="resize-handle-v" id="resize-right"></div>
+
+            <!-- Right: Code Editor -->
+            <div class="panel panel-code" id="code-panel">
+                <div class="panel-header">
+                    <span id="code-title">Code</span>
+                    <div class="code-tabs" id="code-tabs"></div>
+                </div>
+                <div id="editor-container"></div>
+            </div>
+        </div>
+
+        <!-- Horizontal resize handle -->
+        <div class="resize-handle-h" id="resize-bottom"></div>
+
+        <!-- Bottom row: Tests | Console -->
+        <div class="workspace-bottom" id="bottom-panel">
+            <div class="bottom-section" id="results-panel">
                 <div class="panel-header"><span>Tests</span></div>
                 <div class="panel-content" id="test-results">
                     <div class="placeholder-text">
@@ -86,9 +96,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Console -->
-            <div class="sub-panel" id="console-panel">
+            <div class="bottom-section" id="console-panel">
                 <div class="panel-header">
                     <span>Console</span>
                     <button class="btn-small" id="btn-clear-console" title="Clear">

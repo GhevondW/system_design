@@ -1,6 +1,5 @@
 /**
  * SystemForge — Main application entry point.
- * Wires together all UI modules.
  */
 import { GraphEditor } from './graph-editor.js';
 import { CodeEditor } from './code-editor.js';
@@ -19,11 +18,10 @@ class App {
     async init() {
         // Init graph editor
         const canvas = document.getElementById('graph-canvas');
-        canvas.setAttribute('tabindex', '0');
         this.graphEditor = new GraphEditor(canvas);
-
         this.graphEditor.onNodeSelect = (node) => this._onNodeSelect(node);
         this.graphEditor.onNodeDoubleClick = (node) => this._onNodeDoubleClick(node);
+        this.graphEditor.onEditCode = (node) => this._onNodeSelect(node);
 
         // Init code editor
         this.codeEditor = new CodeEditor(document.getElementById('editor-container'));
@@ -32,16 +30,11 @@ class App {
         // Init WASM bridge
         await this.bridge.init();
 
-        // Populate problem selector
         this._setupProblemSelector();
-
-        // Setup button handlers
         this._setupControls();
-
-        // Setup palette drag
         this._setupPalette();
+        this._setupResizers();
 
-        // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                 e.preventDefault();
@@ -49,20 +42,17 @@ class App {
             }
         });
 
-        this._log('info', 'SystemForge initialized');
+        this._log('info', 'SystemForge ready');
     }
 
     _setupProblemSelector() {
         const select = document.getElementById('problem-select');
-        const problems = this.problemLoader.getProblems();
-
-        problems.forEach(p => {
+        for (const p of this.problemLoader.getProblems()) {
             const option = document.createElement('option');
             option.value = p.id;
             option.textContent = `[${p.difficulty}] ${p.name}`;
             select.appendChild(option);
-        });
-
+        }
         select.addEventListener('change', () => {
             if (select.value) this._loadProblem(select.value);
         });
@@ -80,52 +70,114 @@ class App {
     _setupPalette() {
         document.querySelectorAll('.palette-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const type = btn.dataset.type;
-                this.graphEditor.addNode(type);
+                this.graphEditor.addNode(btn.dataset.type);
             });
+        });
+    }
+
+    _setupResizers() {
+        // Left vertical splitter (description | graph)
+        this._makeResizableV('resize-left', 'description-panel', null);
+        // Right vertical splitter (graph | code)
+        this._makeResizableV('resize-right', null, 'code-panel');
+        // Horizontal splitter (top | bottom)
+        this._makeResizableH('resize-bottom', 'bottom-panel');
+    }
+
+    _makeResizableV(handleId, leftPanelId, rightPanelId) {
+        const handle = document.getElementById(handleId);
+        if (!handle) return;
+
+        let startX, startWidth;
+        const panel = leftPanelId
+            ? document.getElementById(leftPanelId)
+            : document.getElementById(rightPanelId);
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startX = e.clientX;
+            startWidth = panel.offsetWidth;
+            handle.classList.add('active');
+
+            const onMove = (e) => {
+                const dx = e.clientX - startX;
+                const newWidth = leftPanelId
+                    ? Math.max(150, startWidth + dx)
+                    : Math.max(150, startWidth - dx);
+                panel.style.width = newWidth + 'px';
+                this.graphEditor._resize();
+            };
+
+            const onUp = () => {
+                handle.classList.remove('active');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    _makeResizableH(handleId, bottomPanelId) {
+        const handle = document.getElementById(handleId);
+        const panel = document.getElementById(bottomPanelId);
+        if (!handle || !panel) return;
+
+        let startY, startHeight;
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startY = e.clientY;
+            startHeight = panel.offsetHeight;
+            handle.classList.add('active');
+
+            const onMove = (e) => {
+                const dy = startY - e.clientY;
+                panel.style.height = Math.max(60, startHeight + dy) + 'px';
+                this.graphEditor._resize();
+            };
+
+            const onUp = () => {
+                handle.classList.remove('active');
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         });
     }
 
     _loadProblem(problemId) {
         const problem = this.problemLoader.getProblem(problemId);
         if (!problem) return;
-
         this.currentProblem = problem;
 
-        // Load graph
         this.graphEditor.loadGraph(problem.graph);
-
-        // Load starter code
         if (problem.starterCode) {
             for (const [nodeId, code] of Object.entries(problem.starterCode)) {
                 this.codeEditor.setCode(nodeId, code);
             }
         }
-
-        // Show description
         this._renderDescription(problem.description);
-
-        // Clear test results
         this._clearTestResults();
-
-        // Setup code tabs
         this._setupCodeTabs(problem);
 
-        // Select the first server node for code editing
         const serverNode = this.graphEditor.nodes.find(n => n.type === 'HttpServer');
         if (serverNode) {
             this.graphEditor.selectNode(serverNode);
             this.codeEditor.setActiveNode(serverNode.id, problem.starterCode?.[serverNode.id]);
         }
 
-        this._log('info', `Loaded problem: ${problem.name}`);
+        this._log('info', `Loaded: ${problem.name}`);
     }
 
     _setupCodeTabs(problem) {
         const tabs = document.getElementById('code-tabs');
         tabs.innerHTML = '';
-
-        const codeNodes = this.graphEditor.nodes.filter(n => n.type === 'HttpServer');
+        const codeNodes = this.graphEditor.nodes.filter(n =>
+            n.type === 'HttpServer' || n.type === 'Worker');
         codeNodes.forEach(node => {
             const tab = document.createElement('button');
             tab.className = 'code-tab';
@@ -135,11 +187,10 @@ class App {
                 tabs.querySelectorAll('.code-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
                 this.codeEditor.setActiveNode(node.id, problem.starterCode?.[node.id]);
+                document.getElementById('code-title').textContent = `Code — ${node.id}`;
             });
             tabs.appendChild(tab);
         });
-
-        // Activate first tab
         const firstTab = tabs.querySelector('.code-tab');
         if (firstTab) firstTab.classList.add('active');
     }
@@ -149,19 +200,17 @@ class App {
             this._log('error', 'No problem loaded');
             return;
         }
-
         this._log('info', 'Running tests...');
-
-        // For now, simulate test running in the browser
-        // In full WASM mode, we'd use the bridge
         const results = this._runTestsLocally();
         this._renderTestResults(results);
     }
 
     _runTestsLocally() {
-        // Mock test execution using problem definition
-        // In production, this goes through the WASM bridge
         const problem = this.currentProblem;
+        const serverNode = this.graphEditor.nodes.find(n => n.type === 'HttpServer');
+        const code = serverNode ? this.codeEditor.getCode(serverNode.id) : '';
+        const hasImpl = code && !code.includes('Not implemented');
+
         const results = {
             total: problem.testCases.length,
             passed: 0,
@@ -169,125 +218,90 @@ class App {
             results: [],
         };
 
-        // Check if the user has written any code
-        const serverNode = this.graphEditor.nodes.find(n => n.type === 'HttpServer');
-        const code = serverNode ? this.codeEditor.getCode(serverNode.id) : '';
-        const hasImplementation = code && !code.includes('Not implemented');
-
         for (const tc of problem.testCases) {
-            const result = {
+            const r = {
                 name: tc.name,
-                passed: hasImplementation, // simplified
-                error: hasImplementation ? '' : 'Handler returns "Not implemented"',
-                logs: [],
+                passed: hasImpl,
+                error: hasImpl ? '' : 'Handler returns "Not implemented"',
             };
-            if (result.passed) results.passed++;
-            else results.failed++;
-            results.results.push(result);
+            if (r.passed) results.passed++; else results.failed++;
+            results.results.push(r);
         }
-
         results.all_passed = results.failed === 0;
         return results;
     }
 
     _stepEvent() {
-        this._log('info', 'Step event (WASM required for full functionality)');
+        this._log('info', 'Step (requires WASM build)');
     }
 
     _reset() {
-        if (this.currentProblem) {
-            this._loadProblem(this.currentProblem.id);
-        }
+        if (this.currentProblem) this._loadProblem(this.currentProblem.id);
         this._log('info', 'Reset');
     }
 
     _onNodeSelect(node) {
-        if (node) {
+        if (node && (node.type === 'HttpServer' || node.type === 'Worker')) {
             document.getElementById('code-title').textContent = `Code — ${node.id}`;
-
-            // Activate corresponding tab
-            document.querySelectorAll('.code-tab').forEach(tab => {
-                tab.classList.toggle('active', tab.dataset.nodeId === node.id);
+            this.codeEditor.setActiveNode(node.id);
+            document.querySelectorAll('.code-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.nodeId === node.id);
             });
         }
     }
 
     _onNodeDoubleClick(node) {
-        if (node && (node.type === 'HttpServer' || node.type === 'Worker')) {
-            this.codeEditor.setActiveNode(node.id);
-        }
+        if (node) this._onNodeSelect(node);
     }
 
-    _renderDescription(markdown) {
-        const container = document.getElementById('problem-description');
-        // Simple markdown to HTML conversion
-        let html = markdown
+    _renderDescription(md) {
+        const el = document.getElementById('problem-description');
+        let html = md
             .replace(/^### (.*$)/gm, '<h3>$1</h3>')
             .replace(/^## (.*$)/gm, '<h2>$1</h2>')
             .replace(/^# (.*$)/gm, '<h1>$1</h1>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/`([^`]+)`/g, '<code>$1</code>')
             .replace(/^- (.*$)/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>');
-        html = '<p>' + html + '</p>';
-        container.innerHTML = html;
+        el.innerHTML = '<p>' + html + '</p>';
     }
 
     _renderTestResults(results) {
-        const container = document.getElementById('test-results');
-
+        const el = document.getElementById('test-results');
         let html = '';
-
-        // Summary
-        const summaryClass = results.all_passed ? 'all-pass' : 'has-fail';
-        html += `<div class="test-summary ${summaryClass}">`;
-        if (results.all_passed) {
-            html += `<i class="fas fa-check-circle" style="color: var(--accent-green)"></i>`;
-            html += `<span>${results.passed}/${results.total} tests passed</span>`;
-        } else {
-            html += `<i class="fas fa-times-circle" style="color: var(--accent-red)"></i>`;
-            html += `<span>${results.passed}/${results.total} passed, ${results.failed} failed</span>`;
-        }
-        html += '</div>';
-
-        // Individual results
+        const cls = results.all_passed ? 'all-pass' : 'has-fail';
+        const icon = results.all_passed ? 'fa-check-circle' : 'fa-times-circle';
+        const color = results.all_passed ? 'var(--accent-green)' : 'var(--accent-red)';
+        html += `<div class="test-summary ${cls}">
+            <i class="fas ${icon}" style="color:${color}"></i>
+            <span>${results.passed}/${results.total} passed</span></div>`;
         for (const r of results.results) {
-            const cls = r.passed ? 'pass' : 'fail';
-            const icon = r.passed ? 'fa-check' : 'fa-times';
-            html += `<div class="test-item ${cls}">`;
-            html += `<i class="fas ${icon} test-icon"></i>`;
-            html += `<span class="test-name">${r.name}</span>`;
-            html += '</div>';
+            const c = r.passed ? 'pass' : 'fail';
+            const i = r.passed ? 'fa-check' : 'fa-times';
+            html += `<div class="test-item ${c}"><i class="fas ${i} test-icon"></i><span class="test-name">${r.name}</span></div>`;
             if (r.error) {
-                html += `<div class="test-item fail"><span class="test-error" style="margin-left: 22px">${r.error}</span></div>`;
+                html += `<div class="test-item fail" style="padding-left:28px"><span class="test-error">${r.error}</span></div>`;
             }
         }
-
-        container.innerHTML = html;
-
-        this._log(results.all_passed ? 'info' : 'error',
-                  `Tests: ${results.passed}/${results.total} passed`);
+        el.innerHTML = html;
+        this._log(results.all_passed ? 'info' : 'error', `Tests: ${results.passed}/${results.total} passed`);
     }
 
     _clearTestResults() {
         document.getElementById('test-results').innerHTML = `
-            <div class="placeholder-text">
-                <i class="fas fa-vial"></i>
-                <p>Run tests to see results</p>
-            </div>`;
+            <div class="placeholder-text"><i class="fas fa-vial"></i><p>Run tests to see results</p></div>`;
     }
 
-    _log(level, message) {
-        const container = document.getElementById('console-output');
-        const time = new Date().toLocaleTimeString();
+    _log(level, msg) {
+        const el = document.getElementById('console-output');
+        const t = new Date().toLocaleTimeString();
         const cls = level === 'error' ? 'log-error' : 'log-info';
-        container.innerHTML += `<div class="log-entry"><span class="log-time">${time}</span><span class="${cls}">${message}</span></div>`;
-        container.scrollTop = container.scrollHeight;
+        el.innerHTML += `<div class="log-entry"><span class="log-time">${t}</span><span class="${cls}">${msg}</span></div>`;
+        el.scrollTop = el.scrollHeight;
     }
 }
 
-// Boot
 const app = new App();
-app.init().catch(err => console.error('App init failed:', err));
+app.init().catch(err => console.error('Init failed:', err));

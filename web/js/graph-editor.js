@@ -1,22 +1,32 @@
 /**
  * GraphEditor — Canvas-based visual graph editor for system components.
+ *
+ * Interactions:
+ *   Left click node:       Select node
+ *   Left drag node:        Move node
+ *   Left drag empty:       Pan canvas
+ *   Left drag from port:   Create edge
+ *   Right click node:      Context menu (Edit Code, Delete, Disconnect)
+ *   Right click edge:      Context menu (Delete Edge)
+ *   Right click empty:     Context menu (Add component)
+ *   Double click node:     Open code editor for that component
+ *   Mouse wheel:           Zoom in/out
+ *   Delete/Backspace:      Delete selected node or edge
  */
 
 const NODE_WIDTH = 160;
 const NODE_HEIGHT = 70;
-const PORT_RADIUS = 6;
+const PORT_RADIUS = 7;
+const EDGE_HIT_TOLERANCE = 8;
+
 const COMPONENT_COLORS = {
     Client: '#58a6ff',
     HttpServer: '#3fb950',
     Database: '#d29922',
     Cache: '#bc8cff',
 };
-const COMPONENT_ICONS = {
-    Client: '\uf007',
-    HttpServer: '\uf233',
-    Database: '\uf1c0',
-    Cache: '\uf0e7',
-};
+
+const CODABLE_TYPES = new Set(['HttpServer', 'Worker']);
 
 export class GraphEditor {
     constructor(canvas) {
@@ -25,47 +35,85 @@ export class GraphEditor {
         this.nodes = [];
         this.edges = [];
         this.selectedNode = null;
+        this.selectedEdge = null;
         this.dragNode = null;
         this.dragOffset = { x: 0, y: 0 };
         this.connectingFrom = null;
+        this.mousePos = { x: 0, y: 0 };
+        this.nextId = 1;
+
+        // Callbacks
         this.onNodeSelect = null;
         this.onNodeDoubleClick = null;
-        this.nextId = 1;
+        this.onEditCode = null;
+
+        // Pan & zoom
+        this.panX = 0;
+        this.panY = 0;
+        this.zoom = 1;
+        this.isPanning = false;
+        this.panStart = { x: 0, y: 0 };
+
+        // Context menu element
+        this.contextMenu = this._createContextMenu();
 
         this._setupEvents();
         this._resize();
         window.addEventListener('resize', () => this._resize());
     }
 
+    // --- Public API ---
+
     addNode(type, x, y) {
-        const id = type.toLowerCase() + '_' + this.nextId++;
+        const id = type.toLowerCase().replace('httpserver', 'server') + '_' + this.nextId++;
         const node = {
-            id,
-            type,
-            x: x || 50 + this.nodes.length * 200,
-            y: y || 100 + (this.nodes.length % 2) * 120,
+            id, type,
+            x: x ?? ((-this.panX + this.canvas.width / 2) / this.zoom - NODE_WIDTH / 2 + (this.nodes.length % 3) * 40),
+            y: y ?? ((-this.panY + this.canvas.height / 2) / this.zoom - NODE_HEIGHT / 2 + (this.nodes.length % 3) * 40),
             width: NODE_WIDTH,
             height: NODE_HEIGHT,
-            code: '',
         };
         this.nodes.push(node);
+        this.selectNode(node);
         this.draw();
         return node;
     }
 
     addEdge(fromId, toId, alias) {
         if (fromId === toId) return;
-        const exists = this.edges.find(e => e.from === fromId && e.to === toId);
-        if (exists) return;
+        if (this.edges.find(e => e.from === fromId && e.to === toId)) return;
         this.edges.push({ from: fromId, to: toId, alias: alias || toId.split('_')[0] });
         this.draw();
     }
 
-    removeSelected() {
-        if (!this.selectedNode) return;
-        const id = this.selectedNode.id;
-        this.nodes = this.nodes.filter(n => n.id !== id);
-        this.edges = this.edges.filter(e => e.from !== id && e.to !== id);
+    removeNode(node) {
+        this.nodes = this.nodes.filter(n => n !== node);
+        this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
+        if (this.selectedNode === node) { this.selectedNode = null; }
+        this.draw();
+        if (this.onNodeSelect) this.onNodeSelect(null);
+    }
+
+    removeEdge(edge) {
+        this.edges = this.edges.filter(e => e !== edge);
+        if (this.selectedEdge === edge) { this.selectedEdge = null; }
+        this.draw();
+    }
+
+    disconnectNode(node) {
+        this.edges = this.edges.filter(e => e.from !== node.id && e.to !== node.id);
+        this.draw();
+    }
+
+    selectNode(node) {
+        this.selectedNode = node;
+        this.selectedEdge = null;
+        this.draw();
+        if (this.onNodeSelect) this.onNodeSelect(node);
+    }
+
+    selectEdge(edge) {
+        this.selectedEdge = edge;
         this.selectedNode = null;
         this.draw();
     }
@@ -74,16 +122,10 @@ export class GraphEditor {
         return {
             components: this.nodes.map(n => {
                 const comp = { id: n.id, type: n.type };
-                if (n.type === 'Database') {
-                    comp.tables = {};
-                }
+                if (n.type === 'Database') comp.tables = n.tables || {};
                 return comp;
             }),
-            connections: this.edges.map(e => ({
-                from: e.from,
-                to: e.to,
-                alias: e.alias,
-            })),
+            connections: this.edges.map(e => ({ from: e.from, to: e.to, alias: e.alias })),
         };
     }
 
@@ -91,307 +133,478 @@ export class GraphEditor {
         this.nodes = [];
         this.edges = [];
         this.nextId = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.zoom = 1;
+        this.selectedNode = null;
+        this.selectedEdge = null;
 
         if (graphJson.components) {
             graphJson.components.forEach((comp, i) => {
                 this.nodes.push({
-                    id: comp.id,
-                    type: comp.type,
-                    x: comp.x || 50 + i * 200,
-                    y: comp.y || 150,
-                    width: NODE_WIDTH,
-                    height: NODE_HEIGHT,
-                    code: comp.code || '',
+                    id: comp.id, type: comp.type,
+                    x: comp.x ?? (80 + i * 220), y: comp.y ?? 120,
+                    width: NODE_WIDTH, height: NODE_HEIGHT,
                     tables: comp.tables || {},
                 });
                 this.nextId++;
             });
         }
-
         if (graphJson.connections) {
-            graphJson.connections.forEach(conn => {
-                this.edges.push({
-                    from: conn.from,
-                    to: conn.to,
-                    alias: conn.alias,
-                });
+            graphJson.connections.forEach(c => {
+                this.edges.push({ from: c.from, to: c.to, alias: c.alias });
             });
         }
-
         this.draw();
     }
 
-    selectNode(node) {
-        this.selectedNode = node;
-        this.draw();
-        if (this.onNodeSelect) this.onNodeSelect(node);
-    }
+    // --- Drawing ---
 
     draw() {
         const ctx = this.ctx;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.save();
+        ctx.translate(this.panX, this.panY);
+        ctx.scale(this.zoom, this.zoom);
 
-        ctx.clearRect(0, 0, w, h);
+        this._drawGrid(ctx);
+        this.edges.forEach(e => this._drawEdge(ctx, e));
+        if (this.connectingFrom) this._drawConnectionLine(ctx);
+        this.nodes.forEach(n => this._drawNode(ctx, n));
 
-        // Draw grid
-        ctx.strokeStyle = '#1a1f27';
-        ctx.lineWidth = 1;
-        for (let x = 0; x < w; x += 30) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, h);
-            ctx.stroke();
-        }
-        for (let y = 0; y < h; y += 30) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
-        }
-
-        // Draw edges
-        this.edges.forEach(edge => {
-            const from = this.nodes.find(n => n.id === edge.from);
-            const to = this.nodes.find(n => n.id === edge.to);
-            if (!from || !to) return;
-
-            const fx = from.x + from.width;
-            const fy = from.y + from.height / 2;
-            const tx = to.x;
-            const ty = to.y + to.height / 2;
-
-            ctx.strokeStyle = '#30363d';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(fx, fy);
-            const cp = (tx - fx) / 2;
-            ctx.bezierCurveTo(fx + cp, fy, tx - cp, ty, tx, ty);
-            ctx.stroke();
-
-            // Arrow
-            const angle = Math.atan2(ty - fy, tx - fx);
-            ctx.fillStyle = '#30363d';
-            ctx.beginPath();
-            ctx.moveTo(tx, ty);
-            ctx.lineTo(tx - 8 * Math.cos(angle - 0.4), ty - 8 * Math.sin(angle - 0.4));
-            ctx.lineTo(tx - 8 * Math.cos(angle + 0.4), ty - 8 * Math.sin(angle + 0.4));
-            ctx.fill();
-
-            // Label
-            const mx = (fx + tx) / 2;
-            const my = (fy + ty) / 2 - 8;
-            ctx.fillStyle = '#484f58';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(edge.alias, mx, my);
-        });
-
-        // Draw connection line while dragging
-        if (this.connectingFrom) {
-            const from = this.connectingFrom.node;
-            ctx.strokeStyle = '#58a6ff';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 3]);
-            ctx.beginPath();
-            ctx.moveTo(from.x + from.width, from.y + from.height / 2);
-            ctx.lineTo(this.connectingFrom.mx, this.connectingFrom.my);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        // Draw nodes
-        this.nodes.forEach(node => {
-            const color = COMPONENT_COLORS[node.type] || '#8b949e';
-            const selected = this.selectedNode === node;
-
-            // Shadow
-            ctx.shadowColor = 'rgba(0,0,0,0.3)';
-            ctx.shadowBlur = selected ? 12 : 6;
-            ctx.shadowOffsetY = 2;
-
-            // Body
-            ctx.fillStyle = '#161b22';
-            ctx.strokeStyle = selected ? color : '#30363d';
-            ctx.lineWidth = selected ? 2 : 1;
-            this._roundRect(ctx, node.x, node.y, node.width, node.height, 8);
-            ctx.fill();
-            ctx.stroke();
-
-            ctx.shadowColor = 'transparent';
-
-            // Header bar
-            ctx.fillStyle = color + '20';
-            this._roundRectTop(ctx, node.x, node.y, node.width, 28, 8);
-            ctx.fill();
-
-            // Type label
-            ctx.fillStyle = color;
-            ctx.font = 'bold 11px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(node.type, node.x + 10, node.y + 18);
-
-            // ID label
-            ctx.fillStyle = '#8b949e';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(node.id, node.x + 10, node.y + 48);
-
-            // Output port (right side)
-            ctx.fillStyle = selected ? color : '#30363d';
-            ctx.beginPath();
-            ctx.arc(node.x + node.width, node.y + node.height / 2, PORT_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#161b22';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Input port (left side)
-            ctx.fillStyle = selected ? color : '#30363d';
-            ctx.beginPath();
-            ctx.arc(node.x, node.y + node.height / 2, PORT_RADIUS, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#161b22';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
+        ctx.restore();
     }
 
-    // --- Private ---
+    _drawGrid(ctx) {
+        const gs = 40;
+        const sx = Math.floor(-this.panX / this.zoom / gs) * gs - gs;
+        const sy = Math.floor(-this.panY / this.zoom / gs) * gs - gs;
+        const ex = sx + this.canvas.width / this.zoom + gs * 2;
+        const ey = sy + this.canvas.height / this.zoom + gs * 2;
+        ctx.strokeStyle = '#1a1f27';
+        ctx.lineWidth = 0.5;
+        for (let x = sx; x < ex; x += gs) { ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, ey); ctx.stroke(); }
+        for (let y = sy; y < ey; y += gs) { ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(ex, y); ctx.stroke(); }
+    }
+
+    _drawEdge(ctx, edge) {
+        const from = this.nodes.find(n => n.id === edge.from);
+        const to = this.nodes.find(n => n.id === edge.to);
+        if (!from || !to) return;
+
+        const pts = this._edgePoints(from, to);
+        const selected = this.selectedEdge === edge;
+
+        ctx.strokeStyle = selected ? '#58a6ff' : '#484f58';
+        ctx.lineWidth = selected ? 3 : 2;
+        ctx.beginPath();
+        ctx.moveTo(pts.fx, pts.fy);
+        ctx.bezierCurveTo(pts.fx + pts.cpx, pts.fy, pts.tx - pts.cpx, pts.ty, pts.tx, pts.ty);
+        ctx.stroke();
+
+        // Arrow
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.beginPath();
+        ctx.moveTo(pts.tx - 2, pts.ty);
+        ctx.lineTo(pts.tx - 10, pts.ty - 5);
+        ctx.lineTo(pts.tx - 10, pts.ty + 5);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = selected ? '#58a6ff' : '#6e7681';
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(edge.alias, (pts.fx + pts.tx) / 2, Math.min(pts.fy, pts.ty) - 10);
+    }
+
+    _edgePoints(from, to) {
+        const fx = from.x + from.width;
+        const fy = from.y + from.height / 2;
+        const tx = to.x;
+        const ty = to.y + to.height / 2;
+        return { fx, fy, tx, ty, cpx: Math.max(Math.abs(tx - fx) * 0.5, 40) };
+    }
+
+    _drawConnectionLine(ctx) {
+        const from = this.connectingFrom.node;
+        const mp = this._screenToWorld(this.mousePos.x, this.mousePos.y);
+        ctx.strokeStyle = '#58a6ff';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(from.x + from.width, from.y + from.height / 2);
+        ctx.lineTo(mp.x, mp.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    _drawNode(ctx, node) {
+        const color = COMPONENT_COLORS[node.type] || '#8b949e';
+        const selected = this.selectedNode === node;
+
+        ctx.shadowColor = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur = selected ? 16 : 8;
+        ctx.shadowOffsetY = 3;
+
+        ctx.fillStyle = '#161b22';
+        ctx.strokeStyle = selected ? color : '#30363d';
+        ctx.lineWidth = selected ? 2.5 : 1.5;
+        this._roundRect(ctx, node.x, node.y, node.width, node.height, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+        // Header tint
+        ctx.fillStyle = color + '18';
+        this._roundRectTop(ctx, node.x + 1, node.y + 1, node.width - 2, 30, 10);
+        ctx.fill();
+
+        // Separator
+        ctx.strokeStyle = '#30363d'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(node.x + 8, node.y + 31); ctx.lineTo(node.x + node.width - 8, node.y + 31); ctx.stroke();
+
+        // Type label
+        ctx.fillStyle = color;
+        ctx.font = 'bold 12px -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(node.type, node.x + 12, node.y + 21);
+
+        // ID
+        ctx.fillStyle = '#8b949e';
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.fillText(node.id, node.x + 12, node.y + 50);
+
+        // Codable indicator
+        if (CODABLE_TYPES.has(node.type)) {
+            ctx.fillStyle = '#484f58';
+            ctx.font = '9px -apple-system, sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('{ }', node.x + node.width - 10, node.y + 50);
+        }
+
+        // Ports
+        this._drawPort(ctx, node.x + node.width, node.y + node.height / 2, color, selected);
+        this._drawPort(ctx, node.x, node.y + node.height / 2, color, selected);
+    }
+
+    _drawPort(ctx, x, y, color, active) {
+        ctx.fillStyle = active ? color : '#30363d';
+        ctx.beginPath(); ctx.arc(x, y, PORT_RADIUS, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#0d1117'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#0d1117';
+        ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // --- Events ---
 
     _setupEvents() {
         this.canvas.addEventListener('mousedown', e => this._onMouseDown(e));
         this.canvas.addEventListener('mousemove', e => this._onMouseMove(e));
         this.canvas.addEventListener('mouseup', e => this._onMouseUp(e));
         this.canvas.addEventListener('dblclick', e => this._onDblClick(e));
+        this.canvas.addEventListener('wheel', e => this._onWheel(e), { passive: false });
+        this.canvas.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            this._onRightClick(e);
+        });
+        document.addEventListener('mousedown', e => {
+            if (!this.contextMenu.contains(e.target)) this._hideContextMenu();
+        });
         document.addEventListener('keydown', e => {
             if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (this.selectedNode && document.activeElement === this.canvas) {
-                    this.removeSelected();
+                const a = document.activeElement;
+                if (a === this.canvas || a === document.body) {
+                    e.preventDefault();
+                    if (this.selectedEdge) this.removeEdge(this.selectedEdge);
+                    else if (this.selectedNode) this.removeNode(this.selectedNode);
                 }
+            }
+            if (e.key === 'Escape') {
+                this.connectingFrom = null;
+                this._hideContextMenu();
+                this.draw();
             }
         });
     }
 
     _getMousePos(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY,
-        };
+        const r = this.canvas.getBoundingClientRect();
+        return { x: e.clientX - r.left, y: e.clientY - r.top };
     }
 
-    _hitTest(pos) {
+    _screenToWorld(sx, sy) {
+        return { x: (sx - this.panX) / this.zoom, y: (sy - this.panY) / this.zoom };
+    }
+
+    _hitNode(wp) {
         for (let i = this.nodes.length - 1; i >= 0; i--) {
             const n = this.nodes[i];
-            if (pos.x >= n.x && pos.x <= n.x + n.width &&
-                pos.y >= n.y && pos.y <= n.y + n.height) {
-                return n;
-            }
+            if (wp.x >= n.x && wp.x <= n.x + n.width && wp.y >= n.y && wp.y <= n.y + n.height) return n;
         }
         return null;
     }
 
-    _hitOutputPort(pos) {
+    _hitPort(wp, side) {
         for (const n of this.nodes) {
-            const px = n.x + n.width;
+            const px = side === 'output' ? n.x + n.width : n.x;
             const py = n.y + n.height / 2;
-            const dx = pos.x - px;
-            const dy = pos.y - py;
-            if (dx * dx + dy * dy <= (PORT_RADIUS + 4) * (PORT_RADIUS + 4)) {
-                return n;
-            }
+            const dx = wp.x - px, dy = wp.y - py;
+            if (dx * dx + dy * dy <= (PORT_RADIUS + 6) ** 2) return n;
         }
         return null;
     }
 
-    _hitInputPort(pos) {
-        for (const n of this.nodes) {
-            const px = n.x;
-            const py = n.y + n.height / 2;
-            const dx = pos.x - px;
-            const dy = pos.y - py;
-            if (dx * dx + dy * dy <= (PORT_RADIUS + 4) * (PORT_RADIUS + 4)) {
-                return n;
-            }
+    _hitEdge(wp) {
+        for (const edge of this.edges) {
+            const from = this.nodes.find(n => n.id === edge.from);
+            const to = this.nodes.find(n => n.id === edge.to);
+            if (!from || !to) continue;
+            const pts = this._edgePoints(from, to);
+            if (this._pointNearBezier(wp.x, wp.y, pts, EDGE_HIT_TOLERANCE)) return edge;
         }
         return null;
+    }
+
+    _pointNearBezier(px, py, pts, tol) {
+        // Sample the bezier and check distance to each segment
+        const steps = 20;
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const bx = this._bezierPoint(t, pts.fx, pts.fx + pts.cpx, pts.tx - pts.cpx, pts.tx);
+            const by = this._bezierPoint(t, pts.fy, pts.fy, pts.ty, pts.ty);
+            const dx = px - bx, dy = py - by;
+            if (dx * dx + dy * dy <= tol * tol) return true;
+        }
+        return false;
+    }
+
+    _bezierPoint(t, p0, p1, p2, p3) {
+        const mt = 1 - t;
+        return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
     }
 
     _onMouseDown(e) {
-        const pos = this._getMousePos(e);
+        if (e.button === 2) return; // right click handled by contextmenu
+        this._hideContextMenu();
+        const sp = this._getMousePos(e);
+        const wp = this._screenToWorld(sp.x, sp.y);
         this.canvas.focus();
 
-        // Check output port click for edge creation
-        const portNode = this._hitOutputPort(pos);
-        if (portNode) {
-            this.connectingFrom = { node: portNode, mx: pos.x, my: pos.y };
+        // Middle mouse or alt+click -> pan
+        if (e.button === 1 || (e.button === 0 && e.altKey)) {
+            this.isPanning = true;
+            this.panStart = { x: sp.x - this.panX, y: sp.y - this.panY };
+            this.canvas.style.cursor = 'grabbing';
             return;
         }
 
-        const node = this._hitTest(pos);
+        // Output port -> connect
+        const portNode = this._hitPort(wp, 'output');
+        if (portNode) {
+            this.connectingFrom = { node: portNode };
+            this.canvas.style.cursor = 'crosshair';
+            return;
+        }
+
+        // Node -> select + drag
+        const node = this._hitNode(wp);
         if (node) {
             this.selectNode(node);
             this.dragNode = node;
-            this.dragOffset = { x: pos.x - node.x, y: pos.y - node.y };
-        } else {
-            this.selectedNode = null;
-            this.draw();
+            this.dragOffset = { x: wp.x - node.x, y: wp.y - node.y };
+            this.canvas.style.cursor = 'move';
+            return;
         }
+
+        // Edge -> select
+        const edge = this._hitEdge(wp);
+        if (edge) {
+            this.selectEdge(edge);
+            return;
+        }
+
+        // Empty -> deselect + pan
+        this.selectedNode = null;
+        this.selectedEdge = null;
+        this.draw();
+        if (this.onNodeSelect) this.onNodeSelect(null);
+        this.isPanning = true;
+        this.panStart = { x: sp.x - this.panX, y: sp.y - this.panY };
+        this.canvas.style.cursor = 'grabbing';
     }
 
     _onMouseMove(e) {
-        const pos = this._getMousePos(e);
+        const sp = this._getMousePos(e);
+        this.mousePos = sp;
 
-        if (this.connectingFrom) {
-            this.connectingFrom.mx = pos.x;
-            this.connectingFrom.my = pos.y;
+        if (this.isPanning) {
+            this.panX = sp.x - this.panStart.x;
+            this.panY = sp.y - this.panStart.y;
+            this.draw();
+            return;
+        }
+        if (this.connectingFrom) { this.draw(); return; }
+        if (this.dragNode) {
+            const wp = this._screenToWorld(sp.x, sp.y);
+            this.dragNode.x = wp.x - this.dragOffset.x;
+            this.dragNode.y = wp.y - this.dragOffset.y;
             this.draw();
             return;
         }
 
-        if (this.dragNode) {
-            this.dragNode.x = pos.x - this.dragOffset.x;
-            this.dragNode.y = pos.y - this.dragOffset.y;
-            this.draw();
-        }
+        // Hover cursor
+        const wp = this._screenToWorld(sp.x, sp.y);
+        if (this._hitPort(wp, 'output')) this.canvas.style.cursor = 'crosshair';
+        else if (this._hitNode(wp)) this.canvas.style.cursor = 'pointer';
+        else if (this._hitEdge(wp)) this.canvas.style.cursor = 'pointer';
+        else this.canvas.style.cursor = 'grab';
     }
 
     _onMouseUp(e) {
-        const pos = this._getMousePos(e);
-
         if (this.connectingFrom) {
-            const target = this._hitInputPort(pos) || this._hitTest(pos);
+            const sp = this._getMousePos(e);
+            const wp = this._screenToWorld(sp.x, sp.y);
+            const target = this._hitPort(wp, 'input') || this._hitNode(wp);
             if (target && target !== this.connectingFrom.node) {
-                const alias = target.type.toLowerCase().replace('httpserver', 'server');
-                this.addEdge(this.connectingFrom.node.id, target.id, alias);
+                this.addEdge(this.connectingFrom.node.id, target.id, target.id.split('_')[0]);
             }
             this.connectingFrom = null;
             this.draw();
         }
-
+        this.isPanning = false;
         this.dragNode = null;
+        this.canvas.style.cursor = 'grab';
     }
 
     _onDblClick(e) {
-        const pos = this._getMousePos(e);
-        const node = this._hitTest(pos);
-        if (node && this.onNodeDoubleClick) {
-            this.onNodeDoubleClick(node);
+        const sp = this._getMousePos(e);
+        const wp = this._screenToWorld(sp.x, sp.y);
+        const node = this._hitNode(wp);
+        if (node) {
+            if (CODABLE_TYPES.has(node.type) && this.onEditCode) {
+                this.onEditCode(node);
+            } else if (this.onNodeDoubleClick) {
+                this.onNodeDoubleClick(node);
+            }
         }
     }
 
-    _resize() {
-        const rect = this.canvas.parentElement.getBoundingClientRect();
-        const headerHeight = this.canvas.parentElement.querySelector('.panel-header')?.offsetHeight || 36;
-        this.canvas.width = rect.width * window.devicePixelRatio;
-        this.canvas.height = (rect.height - headerHeight) * window.devicePixelRatio;
-        this.canvas.style.width = rect.width + 'px';
-        this.canvas.style.height = (rect.height - headerHeight) + 'px';
-        this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    _onWheel(e) {
+        e.preventDefault();
+        const sp = this._getMousePos(e);
+        const wBefore = this._screenToWorld(sp.x, sp.y);
+        this.zoom = Math.max(0.3, Math.min(3, this.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+        const wAfter = this._screenToWorld(sp.x, sp.y);
+        this.panX += (wAfter.x - wBefore.x) * this.zoom;
+        this.panY += (wAfter.y - wBefore.y) * this.zoom;
         this.draw();
     }
+
+    // --- Right-click Context Menu ---
+
+    _onRightClick(e) {
+        const sp = this._getMousePos(e);
+        const wp = this._screenToWorld(sp.x, sp.y);
+
+        const node = this._hitNode(wp);
+        const edge = this._hitEdge(wp);
+
+        const items = [];
+
+        if (node) {
+            this.selectNode(node);
+            if (CODABLE_TYPES.has(node.type)) {
+                items.push({ label: 'Edit Code', icon: 'fa-code', action: () => {
+                    if (this.onEditCode) this.onEditCode(node);
+                }});
+                items.push({ separator: true });
+            }
+            items.push({ label: 'Disconnect All', icon: 'fa-unlink', action: () => this.disconnectNode(node) });
+            items.push({ label: 'Delete Component', icon: 'fa-trash', danger: true, action: () => this.removeNode(node) });
+        } else if (edge) {
+            this.selectEdge(edge);
+            const fromNode = this.nodes.find(n => n.id === edge.from);
+            const toNode = this.nodes.find(n => n.id === edge.to);
+            const label = `${fromNode?.id || '?'} → ${toNode?.id || '?'}`;
+            items.push({ label: label, icon: 'fa-arrow-right', disabled: true });
+            items.push({ separator: true });
+            items.push({ label: 'Delete Edge', icon: 'fa-trash', danger: true, action: () => this.removeEdge(edge) });
+        } else {
+            items.push({ label: 'Add Client', icon: 'fa-user', action: () => this.addNode('Client', wp.x, wp.y) });
+            items.push({ label: 'Add HTTP Server', icon: 'fa-server', action: () => this.addNode('HttpServer', wp.x, wp.y) });
+            items.push({ label: 'Add Database', icon: 'fa-database', action: () => this.addNode('Database', wp.x, wp.y) });
+            items.push({ label: 'Add Cache', icon: 'fa-bolt', action: () => this.addNode('Cache', wp.x, wp.y) });
+        }
+
+        this._showContextMenu(e.clientX, e.clientY, items);
+    }
+
+    _createContextMenu() {
+        const menu = document.createElement('div');
+        menu.className = 'graph-context-menu';
+        menu.style.cssText = `
+            display: none; position: fixed; z-index: 1000;
+            background: #1c2128; border: 1px solid #30363d; border-radius: 8px;
+            padding: 4px 0; min-width: 180px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            font-family: -apple-system, sans-serif; font-size: 13px;
+        `;
+        document.body.appendChild(menu);
+        return menu;
+    }
+
+    _showContextMenu(x, y, items) {
+        const menu = this.contextMenu;
+        menu.innerHTML = '';
+
+        for (const item of items) {
+            if (item.separator) {
+                const sep = document.createElement('div');
+                sep.style.cssText = 'height:1px; background:#30363d; margin:4px 8px;';
+                menu.appendChild(sep);
+                continue;
+            }
+            const row = document.createElement('div');
+            row.style.cssText = `
+                display: flex; align-items: center; gap: 10px;
+                padding: 6px 14px; cursor: ${item.disabled ? 'default' : 'pointer'};
+                color: ${item.danger ? '#f85149' : item.disabled ? '#484f58' : '#e6edf3'};
+                transition: background 0.1s;
+            `;
+            if (!item.disabled) {
+                row.addEventListener('mouseenter', () => row.style.background = '#30363d');
+                row.addEventListener('mouseleave', () => row.style.background = 'none');
+                row.addEventListener('click', () => { this._hideContextMenu(); item.action(); });
+            }
+            row.innerHTML = `<i class="fas ${item.icon}" style="width:16px;text-align:center;font-size:12px"></i><span>${item.label}</span>`;
+            menu.appendChild(row);
+        }
+
+        // Position (keep on screen)
+        menu.style.display = 'block';
+        const mw = menu.offsetWidth, mh = menu.offsetHeight;
+        menu.style.left = Math.min(x, window.innerWidth - mw - 8) + 'px';
+        menu.style.top = Math.min(y, window.innerHeight - mh - 8) + 'px';
+    }
+
+    _hideContextMenu() {
+        this.contextMenu.style.display = 'none';
+    }
+
+    // --- Resize ---
+
+    _resize() {
+        const parent = this.canvas.parentElement;
+        const header = parent.querySelector('.panel-header');
+        const headerH = header ? header.offsetHeight : 0;
+        this.canvas.width = parent.clientWidth;
+        this.canvas.height = parent.clientHeight - headerH;
+        this.canvas.style.width = this.canvas.width + 'px';
+        this.canvas.style.height = this.canvas.height + 'px';
+        this.draw();
+    }
+
+    // --- Geometry helpers ---
 
     _roundRect(ctx, x, y, w, h, r) {
         ctx.beginPath();
