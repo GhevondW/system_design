@@ -21,8 +21,12 @@ public:
     lang::ScriptValue GetApiObject() override;
     void Reset() override;
 
-    // Route management
+    // Route management — handler as callable
     void AddRoute(const std::string& method, const std::string& path, RequestHandler handler);
+
+    // Route management — handler as function name (resolved via interpreter at request time)
+    void AddRoute(const std::string& method, const std::string& path,
+                  const std::string& handler_name);
 
     // Set interpreter for running user code
     void SetInterpreter(lang::Interpreter* interpreter);
@@ -35,7 +39,8 @@ private:
     struct Route {
         std::string method;
         std::string path;
-        RequestHandler handler;
+        std::string handler_name;    // function name — resolved via interpreter
+        RequestHandler handler;      // direct callable (used if handler_name is empty)
     };
 
     std::vector<Route> routes_;

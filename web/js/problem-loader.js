@@ -49,7 +49,9 @@ db.Insert("cars", { plate: "ABC123", owner: "Alice" });
         graph: {
             components: [
                 { id: 'client', type: 'Client', x: 50, y: 150 },
-                { id: 'server', type: 'HttpServer', x: 280, y: 150 },
+                { id: 'server', type: 'HttpServer', x: 280, y: 150, routes: [
+                    { method: 'POST', path: '/register', handler: 'handle_register' },
+                ] },
                 { id: 'db', type: 'Database', x: 520, y: 150 },
             ],
             connections: [
@@ -65,9 +67,6 @@ db.Insert("cars", { plate: "ABC123", owner: "Alice" });
     return { status: 500, body: "Not implemented" };
 }`,
         },
-        routes: [
-            { componentId: 'server', method: 'POST', path: '/register', handler: 'handle_register' },
-        ],
         testCases: [
             {
                 name: 'Register a new car',
@@ -135,7 +134,11 @@ Build a simple in-memory key-value store API.
         graph: {
             components: [
                 { id: 'client', type: 'Client', x: 50, y: 150 },
-                { id: 'server', type: 'HttpServer', x: 280, y: 150 },
+                { id: 'server', type: 'HttpServer', x: 280, y: 150, routes: [
+                    { method: 'POST', path: '/set', handler: 'handle_set' },
+                    { method: 'POST', path: '/get', handler: 'handle_get' },
+                    { method: 'POST', path: '/del', handler: 'handle_del' },
+                ] },
                 { id: 'cache', type: 'Cache', x: 520, y: 150 },
             ],
             connections: [
@@ -158,11 +161,6 @@ fn handle_del(req) {
     return { status: 500, body: "Not implemented" };
 }`,
         },
-        routes: [
-            { componentId: 'server', method: 'POST', path: '/set', handler: 'handle_set' },
-            { componentId: 'server', method: 'POST', path: '/get', handler: 'handle_get' },
-            { componentId: 'server', method: 'POST', path: '/del', handler: 'handle_del' },
-        ],
         testCases: [
             {
                 name: 'Set and get a value',
@@ -214,7 +212,10 @@ Build a user directory service with lookup by username.
         graph: {
             components: [
                 { id: 'client', type: 'Client', x: 50, y: 150 },
-                { id: 'server', type: 'HttpServer', x: 280, y: 150 },
+                { id: 'server', type: 'HttpServer', x: 280, y: 150, routes: [
+                    { method: 'POST', path: '/users', handler: 'handle_create' },
+                    { method: 'POST', path: '/lookup', handler: 'handle_lookup' },
+                ] },
                 { id: 'db', type: 'Database', x: 520, y: 150 },
             ],
             connections: [
@@ -237,10 +238,6 @@ fn handle_lookup(req) {
     return { status: 500, body: "Not implemented" };
 }`,
         },
-        routes: [
-            { componentId: 'server', method: 'POST', path: '/users', handler: 'handle_create' },
-            { componentId: 'server', method: 'POST', path: '/lookup', handler: 'handle_lookup' },
-        ],
         testCases: [
             {
                 name: 'Create a new user',

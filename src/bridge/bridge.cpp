@@ -57,7 +57,16 @@ void BuildGraphFromJson(engine::SimulationEngine& eng, const json& graph_json) {
             if (type == "Client") {
                 graph.AddComponent(std::make_unique<components::Client>(id));
             } else if (type == "HttpServer") {
-                graph.AddComponent(std::make_unique<components::HttpServer>(id));
+                auto server = std::make_unique<components::HttpServer>(id);
+                if (comp.contains("routes")) {
+                    for (const auto& r : comp["routes"]) {
+                        server->AddRoute(
+                            r["method"].get<std::string>(),
+                            r["path"].get<std::string>(),
+                            r["handler"].get<std::string>());
+                    }
+                }
+                graph.AddComponent(std::move(server));
             } else if (type == "Database") {
                 auto db = std::make_unique<components::Database>(id);
                 if (comp.contains("tables")) {

@@ -7,7 +7,6 @@ HttpServer::HttpServer(engine::ComponentId id)
 
 std::vector<engine::Event> HttpServer::HandleEvent(const engine::Event& event,
                                                     engine::Timestamp current_time) {
-    // Handle incoming NetworkRequest
     if (auto* req = std::get_if<engine::NetworkRequest>(&event)) {
         auto response_body = HandleRequest(req->method, req->path, req->body);
 
@@ -44,12 +43,17 @@ lang::ScriptValue HttpServer::GetApiObject() {
 }
 
 void HttpServer::Reset() {
-    // Preserve routes — they're part of the problem definition, not runtime state
+    // Preserve routes — they're part of the design, not runtime state
 }
 
 void HttpServer::AddRoute(const std::string& method, const std::string& path,
                           RequestHandler handler) {
-    routes_.push_back(Route{method, path, std::move(handler)});
+    routes_.push_back(Route{method, path, "", std::move(handler)});
+}
+
+void HttpServer::AddRoute(const std::string& method, const std::string& path,
+                          const std::string& handler_name) {
+    routes_.push_back(Route{method, path, handler_name, nullptr});
 }
 
 void HttpServer::SetInterpreter(lang::Interpreter* interpreter) {
@@ -60,19 +64,34 @@ lang::ScriptValue HttpServer::HandleRequest(const std::string& method, const std
                                             const lang::ScriptValue& body) {
     for (const auto& route : routes_) {
         if (route.method == method && route.path == path) {
-            // Build request object
             lang::ScriptValue req(lang::ScriptMap{
                 {"method", lang::ScriptValue(method)},
                 {"path", lang::ScriptValue(path)},
                 {"body", body},
                 {"params", lang::ScriptValue(lang::ScriptMap{})},
             });
-            return route.handler(req);
+
+            // If handler_name is set, resolve via interpreter
+            if (!route.handler_name.empty() && interpreter_) {
+                auto fn_opt = interpreter_->GetGlobalEnv()->Get(route.handler_name);
+                if (fn_opt.has_value() && fn_opt->IsNativeFunction()) {
+                    return fn_opt->AsNativeFunction()(std::vector<lang::ScriptValue>{req});
+                }
+                return lang::ScriptValue(lang::ScriptMap{
+                    {"status", lang::ScriptValue(500)},
+                    {"body", lang::ScriptValue("Handler not found: " + route.handler_name)},
+                });
+            }
+
+            // Direct callable handler
+            if (route.handler) {
+                return route.handler(req);
+            }
         }
     }
     return lang::ScriptValue(lang::ScriptMap{
         {"status", lang::ScriptValue(404)},
-        {"body", lang::ScriptValue("Not found")},
+        {"body", lang::ScriptValue("Not found: " + method + " " + path)},
     });
 }
 
