@@ -1,5 +1,10 @@
 # SystemForge — LeetCode for System Design
 
+[![CI](https://github.com/GhevondW/system_design/actions/workflows/ci.yml/badge.svg)](https://github.com/GhevondW/system_design/actions/workflows/ci.yml)
+[![Deploy](https://github.com/GhevondW/system_design/actions/workflows/deploy.yml/badge.svg)](https://github.com/GhevondW/system_design/actions/workflows/deploy.yml)
+
+**Live:** [https://ghevondw.github.io/system_design/](https://ghevondw.github.io/system_design/)
+
 An interactive platform where engineers learn system design by building real systems. Users solve problems by wiring together components (servers, databases, queues, caches) in a visual graph editor and writing handler logic in SysLang — a small, C++-flavored scripting language. The system simulates execution and validates correctness via test cases.
 
 ```
