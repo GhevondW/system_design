@@ -52,6 +52,8 @@ cmake-build*/
 *~
 .DS_Store
 
-# WASM output
+# WASM output (built from src/ into build/wasm/ and copied to web/)
 *.wasm
 *.wasm.map
+/web/systemforge.js
+/web/systemforge.wasm

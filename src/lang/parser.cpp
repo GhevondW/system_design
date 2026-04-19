@@ -149,6 +149,8 @@ ExprPtr Parser::ParseAssignment() {
     auto expr = ParseOr();
 
     if (Match(TokenType::kAssign)) {
+        // Right-associative: `a = b = c` parses as `a = (b = c)`, unlike the
+        // left-associative while-loops used for the other binary operators below.
         auto value = ParseAssignment();
         return MakeExpr(AssignExpr{std::move(expr), std::move(value)});
     }
@@ -296,10 +298,12 @@ ExprPtr Parser::ParsePrimary() {
 ExprPtr Parser::ParseListLiteral() {
     Advance();  // consume [
 
-    // Save position for backtracking if lambda detection fails
+    // `[` is ambiguous: both list literals `[a, b, c]` and lambdas
+    // `[captures](params) { body }` start with it. We peek forward assuming a
+    // capture list; if we don't find the `](` that confirms a lambda, we rewind
+    // pos_ to saved_pos and fall through to the list-literal branch.
     size_t saved_pos = pos_;
 
-    // Try to parse as lambda: [captures?](params) { body }
     std::vector<Token> captures;
     if (Check(TokenType::kIdentifier)) {
         // Tentatively parse capture list

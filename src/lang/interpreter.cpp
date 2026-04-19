@@ -182,6 +182,9 @@ void Interpreter::ExecuteReturnStmt(const ReturnStmt& stmt, std::shared_ptr<Envi
     if (stmt.value.has_value()) {
         value = Evaluate(*stmt.value.value(), env);
     }
+    // Exception-as-control-flow: unwinds out of any nested blocks/loops up to
+    // the nearest call frame (see ExecuteFnDecl / EvalLambda), where it's caught
+    // and the carried value becomes the function's return value.
     throw ReturnSignal{std::move(value)};
 }
 
@@ -408,7 +411,9 @@ ScriptValue Interpreter::EvalMapLiteral(const MapLiteralExpr& expr,
 ScriptValue Interpreter::EvalLambda(const LambdaExpr& expr, std::shared_ptr<Environment> env) {
     auto closure_env = env;
 
-    // If there are captures, create a new env with captured values
+    // Explicit capture list (`[x, y](args) { ... }`) narrows the closure to
+    // just the named variables. Without captures we fall back to capturing the
+    // full enclosing scope (C++-style `[&]` / JS-style implicit capture).
     if (!expr.captures.empty()) {
         closure_env = env->CreateChild();
         for (const auto& cap : expr.captures) {
@@ -524,7 +529,8 @@ ScriptValue Interpreter::CallMethod(const ScriptValue& object, const std::string
         }
     }
 
-    // Map methods
+    // Map methods. A map value can also *store* a callable under a key and be
+    // invoked as `obj.key(args)` — see the fallback at the end of this block.
     if (object.IsMap()) {
         auto& map = object.AsMap();
         if (method == "size") return ScriptValue(static_cast<int64_t>(map.size()));

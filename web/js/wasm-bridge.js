@@ -27,7 +27,6 @@ export class WasmBridge {
             this.module = await SystemForge();
             this.handle = this.module._engine_create();
             this.ready = true;
-            console.log('[WasmBridge] Engine created, handle:', this.handle);
         } catch (e) {
             console.warn('[WasmBridge] WASM not available, using mock mode:', e.message);
             this.mock = true;

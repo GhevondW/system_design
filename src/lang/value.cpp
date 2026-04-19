@@ -248,11 +248,13 @@ ScriptValue CompareOp(const ScriptValue& lhs, const ScriptValue& rhs,
 // --- Arithmetic ---
 
 ScriptValue ScriptValue::Add(const ScriptValue& lhs, const ScriptValue& rhs) {
-    // String concatenation
+    // A string on either side coerces the other operand via ToString — matches
+    // JS semantics (`1 + "2" == "12"`), chosen so users can build log/response
+    // strings without explicit str() calls. The numeric path below runs only
+    // when neither operand is a string.
     if (lhs.IsString() && rhs.IsString()) {
         return ScriptValue(lhs.AsString() + rhs.AsString());
     }
-    // String + anything = string concatenation
     if (lhs.IsString()) {
         return ScriptValue(lhs.AsString() + rhs.ToString());
     }

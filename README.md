@@ -23,6 +23,31 @@ An interactive platform where engineers learn system design by building real sys
 +-----------------------------------------------------+
 ```
 
+## Getting Started
+
+**Prerequisites:** Docker + Docker Compose. Everything else (CMake, Emscripten, Google Test) runs inside the container.
+
+```bash
+# Build the WASM target and serve the web UI at http://localhost:8080
+./dev.sh serve
+
+# Run all tests (native C++ + WASM build check)
+./dev.sh test-all
+
+# Run just the native C++ unit tests
+./dev.sh test-native
+
+# Format all C++ sources with clang-format
+./dev.sh format
+
+# Drop into an interactive build shell
+./dev.sh shell
+```
+
+Once `./dev.sh serve` is running, open [http://localhost:8080](http://localhost:8080) and pick a problem from the browser. For a Debug build with asserts enabled, use `BUILD_TYPE=Debug ./dev.sh serve`.
+
+> **Note:** `web/systemforge.js` and `web/systemforge.wasm` are build artifacts produced by the WASM target and copied into `web/` during `./dev.sh serve`. They are gitignored — don't commit them.
+
 ## Design Documents
 
 Full spec lives in [`docs/superpowers/specs/design/`](docs/superpowers/specs/design/):
