@@ -46,6 +46,12 @@ add_library(systemforge_engine STATIC
     src/engine/event.cpp
     src/engine/clock.cpp
     src/engine/event_queue.cpp
+    src/engine/component.cpp
+    src/engine/graph.cpp
+    src/components/client.cpp
+    src/components/http_server.cpp
+    src/components/database.cpp
+    src/components/cache.cpp
 )
 
 target_include_directories(systemforge_engine PUBLIC
@@ -108,6 +114,7 @@ else()
         tests/lang/parser_test.cpp
         tests/lang/interpreter_test.cpp
         tests/engine/event_queue_test.cpp
+        tests/components/component_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
