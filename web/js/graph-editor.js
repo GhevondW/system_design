@@ -162,8 +162,10 @@ export class GraphEditor {
 
     draw() {
         const ctx = this.ctx;
+        const dpr = this.dpr || 1;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.save();
+        ctx.scale(dpr, dpr);
         ctx.translate(this.panX, this.panY);
         ctx.scale(this.zoom, this.zoom);
 
@@ -177,10 +179,13 @@ export class GraphEditor {
 
     _drawGrid(ctx) {
         const gs = 40;
+        const dpr = this.dpr || 1;
+        const cssW = this.canvas.width / dpr;
+        const cssH = this.canvas.height / dpr;
         const sx = Math.floor(-this.panX / this.zoom / gs) * gs - gs;
         const sy = Math.floor(-this.panY / this.zoom / gs) * gs - gs;
-        const ex = sx + this.canvas.width / this.zoom + gs * 2;
-        const ey = sy + this.canvas.height / this.zoom + gs * 2;
+        const ex = sx + cssW / this.zoom + gs * 2;
+        const ey = sy + cssH / this.zoom + gs * 2;
         ctx.strokeStyle = '#1a1f27';
         ctx.lineWidth = 0.5;
         for (let x = sx; x < ex; x += gs) { ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, ey); ctx.stroke(); }
@@ -597,10 +602,18 @@ export class GraphEditor {
         const parent = this.canvas.parentElement;
         const header = parent.querySelector('.panel-header');
         const headerH = header ? header.offsetHeight : 0;
-        this.canvas.width = parent.clientWidth;
-        this.canvas.height = parent.clientHeight - headerH;
-        this.canvas.style.width = this.canvas.width + 'px';
-        this.canvas.style.height = this.canvas.height + 'px';
+        const dpr = window.devicePixelRatio || 1;
+        const w = parent.clientWidth;
+        const h = parent.clientHeight - headerH;
+
+        // Set the canvas internal size to account for HiDPI
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+
+        // Scale the context so drawing coordinates match CSS pixels
+        this.dpr = dpr;
         this.draw();
     }
 
