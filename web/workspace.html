@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SystemForge</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/workspace.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <header class="top-bar">
+        <a href="index.html" class="logo"><i class="fas fa-cogs"></i><span>SystemForge</span></a>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="workspace.html" class="active">Problems</a>
+            <a href="docs.html">Docs</a>
+        </nav>
+        <nav class="problem-nav">
+            <select id="problem-select">
+                <option value="">Select a problem...</option>
+            </select>
+        </nav>
+        <div class="nav-right">
+            <button id="btn-run" class="btn btn-primary" title="Run All Tests (Ctrl+Enter)">
+                <i class="fas fa-play"></i> Run
+            </button>
+            <button id="btn-step" class="btn" title="Step Event">
+                <i class="fas fa-step-forward"></i> Step
+            </button>
+            <button id="btn-reset" class="btn" title="Reset">
+                <i class="fas fa-redo"></i> Reset
+            </button>
+            <button class="btn-icon" id="theme-toggle" onclick="import('./js/theme.js').then(m=>m.toggleTheme())">
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </header>
+
+    <main class="workspace">
+        <!-- Top row: Description | Graph | Code -->
+        <div class="workspace-top">
+            <!-- Left: Problem Description -->
+            <div class="panel panel-description" id="description-panel">
+                <div class="panel-header"><span>Problem</span></div>
+                <div class="panel-content" id="problem-description">
+                    <div class="placeholder-text">
+                        <i class="fas fa-book"></i>
+                        <p>Select a problem to get started</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="resize-handle-v" id="resize-left"></div>
+
+            <!-- Center: Graph Editor -->
+            <div class="panel panel-graph" id="graph-panel">
+                <div class="panel-header">
+                    <span>Architecture</span>
+                    <div class="component-palette">
+                        <button class="palette-btn" data-type="Client" title="Add Client">
+                            <i class="fas fa-user"></i>
+                        </button>
+                        <button class="palette-btn" data-type="HttpServer" title="Add HTTP Server">
+                            <i class="fas fa-server"></i>
+                        </button>
+                        <button class="palette-btn" data-type="Database" title="Add Database">
+                            <i class="fas fa-database"></i>
+                        </button>
+                        <button class="palette-btn" data-type="Cache" title="Add Cache">
+                            <i class="fas fa-bolt"></i>
+                        </button>
+                    </div>
+                </div>
+                <canvas id="graph-canvas" tabindex="0"></canvas>
+            </div>
+
+            <div class="resize-handle-v" id="resize-right"></div>
+
+            <!-- Right: Code Editor -->
+            <div class="panel panel-code" id="code-panel">
+                <div class="panel-header">
+                    <span id="code-title">Code</span>
+                    <div class="code-tabs" id="code-tabs"></div>
+                </div>
+                <div id="editor-container"></div>
+            </div>
+        </div>
+
+        <!-- Horizontal resize handle -->
+        <div class="resize-handle-h" id="resize-bottom"></div>
+
+        <!-- Bottom row: Tests | Console -->
+        <div class="workspace-bottom" id="bottom-panel">
+            <div class="bottom-section" id="results-panel">
+                <div class="panel-header"><span>Tests</span></div>
+                <div class="panel-content" id="test-results">
+                    <div class="placeholder-text">
+                        <i class="fas fa-vial"></i>
+                        <p>Run tests to see results</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-section" id="console-panel">
+                <div class="panel-header">
+                    <span>Console</span>
+                    <button class="btn-small" id="btn-clear-console" title="Clear">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="panel-content console-output" id="console-output"></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import './js/theme.js';
+    </script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

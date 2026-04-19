@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SystemForge — Docs</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/shared.css">
+    <link rel="stylesheet" href="css/docs.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <header class="top-bar">
+        <a href="index.html" class="logo"><i class="fas fa-cogs"></i><span>SystemForge</span></a>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="workspace.html">Problems</a>
+            <a href="docs.html" class="active">Docs</a>
+        </nav>
+        <div class="nav-right">
+            <button class="btn-icon" id="theme-toggle" onclick="import('./js/theme.js').then(m=>m.toggleTheme())">
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="docs-layout">
+        <aside class="docs-sidebar">
+            <nav>
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Getting Started</div>
+                    <a href="#overview" class="sidebar-link active">Overview</a>
+                    <a href="#quickstart" class="sidebar-link">Quick Start</a>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-title">SysLang Reference</div>
+                    <a href="#variables" class="sidebar-link">Variables</a>
+                    <a href="#functions" class="sidebar-link">Functions</a>
+                    <a href="#lambdas" class="sidebar-link">Lambdas</a>
+                    <a href="#control-flow" class="sidebar-link">Control Flow</a>
+                    <a href="#match" class="sidebar-link">Pattern Matching</a>
+                    <a href="#data-structures" class="sidebar-link">Data Structures</a>
+                    <a href="#strings" class="sidebar-link">String Operations</a>
+                    <a href="#builtins" class="sidebar-link">Built-in Functions</a>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Component APIs</div>
+                    <a href="#comp-client" class="sidebar-link">Client</a>
+                    <a href="#comp-server" class="sidebar-link">HTTP Server</a>
+                    <a href="#comp-database" class="sidebar-link">Database</a>
+                    <a href="#comp-cache" class="sidebar-link">Cache</a>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-title">Database Queries</div>
+                    <a href="#sql-select" class="sidebar-link">SELECT</a>
+                    <a href="#sql-insert" class="sidebar-link">INSERT</a>
+                    <a href="#sql-update" class="sidebar-link">UPDATE</a>
+                    <a href="#sql-delete" class="sidebar-link">DELETE</a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="docs-content">
+            <!-- Overview -->
+            <section id="overview">
+                <h1>SystemForge Documentation</h1>
+                <p>SystemForge is a platform for learning system design by building real systems. You wire components together in a visual graph editor and write handler logic in <strong>SysLang</strong> — a simple scripting language.</p>
+
+                <div class="callout">
+                    <i class="fas fa-lightbulb"></i>
+                    <div>
+                        <strong>How it works:</strong> Select a problem, connect components (servers, databases, caches), write handlers, and run tests. Your architecture is validated against test cases — just like LeetCode, but for distributed systems.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Start -->
+            <section id="quickstart">
+                <h2>Quick Start</h2>
+                <ol>
+                    <li>Go to <a href="workspace.html">Problems</a> and select <strong>Car Registration</strong></li>
+                    <li>The graph shows: Client → HTTP Server → Database</li>
+                    <li>Click the server node to open the code editor</li>
+                    <li>Implement the <code>handle_register</code> function</li>
+                    <li>Click <strong>Run</strong> (or Ctrl+Enter) to test your solution</li>
+                </ol>
+
+                <h3>Your handler receives:</h3>
+<pre><code>// req object passed to your handler:
+{
+    method: "POST",        // HTTP method
+    path: "/register",     // request path
+    body: {                // request body (map)
+        plate: "ABC123",
+        owner: "Alice"
+    },
+    params: {}             // URL parameters
+}</code></pre>
+
+                <h3>Your handler returns:</h3>
+<pre><code>// Return a map with status and body:
+return {
+    status: 201,
+    body: { registered: true }
+};</code></pre>
+            </section>
+
+            <!-- SysLang: Variables -->
+            <section id="variables">
+                <h2>Variables</h2>
+                <p>Use <code>let</code> to declare variables. No type annotations — types are inferred.</p>
+<pre><code>let name = "car_reg";
+let count = 0;
+let active = true;
+let pi = 3.14;
+let nothing = null;
+let plates = ["ABC123", "XYZ789"];                      // list
+let car = { plate: "ABC123", owner: "Alice", year: 2024 }; // map</code></pre>
+            </section>
+
+            <!-- Functions -->
+            <section id="functions">
+                <h2>Functions</h2>
+                <p>Use <code>fn</code> to declare functions. Functions are first-class values and support closures.</p>
+<pre><code>fn validate_plate(plate) {
+    if (plate.length() != 6) {
+        return { ok: false, error: "invalid length" };
+    }
+    return { ok: true };
+}
+
+fn add(a, b) {
+    return a + b;
+}
+
+// Functions can call other functions
+fn process(plate) {
+    let result = validate_plate(plate);
+    if (!result.ok) {
+        log("Invalid: " + result.error);
+    }
+    return result;
+}
+
+// Recursion works
+fn factorial(n) {
+    if (n <= 1) { return 1; }
+    return n * factorial(n - 1);
+}</code></pre>
+            </section>
+
+            <!-- Lambdas -->
+            <section id="lambdas">
+                <h2>Lambdas</h2>
+                <p>Anonymous functions with C++-style capture syntax.</p>
+<pre><code>// No capture
+let add = [](a, b) { return a + b; };
+let result = add(3, 4);  // 7
+
+// With capture (captured by value)
+let threshold = 100;
+let check = [threshold](val) { return val > threshold; };
+check(150);  // true
+
+// Closures
+fn make_adder(x) {
+    return [x](y) { return x + y; };
+}
+let add5 = make_adder(5);
+add5(3);  // 8</code></pre>
+            </section>
+
+            <!-- Control Flow -->
+            <section id="control-flow">
+                <h2>Control Flow</h2>
+<pre><code>// if / else if / else
+if (count > 10) {
+    log("too many");
+} else if (count == 0) {
+    log("none");
+} else {
+    log("ok");
+}
+
+// for — iterates over lists
+for (let plate : plates) {
+    log(plate);
+}
+
+// while
+let i = 0;
+while (i < 10) {
+    log(i);
+    i = i + 1;
+}
+
+// Logical operators
+if (a > 0 && b > 0) { log("both positive"); }
+if (a > 0 || b > 0) { log("at least one positive"); }
+if (!active) { log("inactive"); }</code></pre>
+            </section>
+
+            <!-- Match -->
+            <section id="match">
+                <h2>Pattern Matching</h2>
+                <p>Match expressions compare a value against patterns. Use <code>_</code> as a wildcard.</p>
+<pre><code>fn handle_request(req) {
+    return match (req.method) {
+        "GET"  => get_data(req),
+        "POST" => create_data(req),
+        "PUT"  => update_data(req),
+        _      => { status: 405, body: "Method not allowed" }
+    };
+}</code></pre>
+            </section>
+
+            <!-- Data Structures -->
+            <section id="data-structures">
+                <h2>Data Structures</h2>
+                <h3>Lists</h3>
+<pre><code>let items = [1, 2, 3];
+items.push(4);              // [1, 2, 3, 4]
+let first = items[0];       // 1
+let count = items.size();   // 4
+let last = items.pop();     // 4 (removes from list)</code></pre>
+
+                <h3>Maps</h3>
+<pre><code>let user = { name: "Alice", age: 30 };
+user.email = "alice@example.com";   // add field
+let name = user.name;               // access field
+let has = user.has("email");        // true
+let n = user.size();                // 3
+let keys = user.keys();            // ["age", "email", "name"]</code></pre>
+
+                <h3>Nesting</h3>
+<pre><code>let response = {
+    status: 200,
+    body: {
+        users: [
+            { name: "Alice", role: "admin" },
+            { name: "Bob",   role: "user" }
+        ]
+    }
+};
+let role = response.body.users[0].role;  // "admin"</code></pre>
+            </section>
+
+            <!-- Strings -->
+            <section id="strings">
+                <h2>String Operations</h2>
+<pre><code>let s = "hello world";
+s.length();              // 11
+s.contains("world");     // true
+s.split(" ");            // ["hello", "world"]
+s.upper();               // "HELLO WORLD"
+s.lower();               // "hello world"
+s.substr(0, 5);          // "hello"
+s + " !!!";              // "hello world !!!"</code></pre>
+            </section>
+
+            <!-- Builtins -->
+            <section id="builtins">
+                <h2>Built-in Functions</h2>
+                <table>
+                    <thead><tr><th>Function</th><th>Description</th><th>Example</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>log(value)</code></td><td>Print to console</td><td><code>log("hello")</code></td></tr>
+                        <tr><td><code>print(value)</code></td><td>Alias for log</td><td><code>print(42)</code></td></tr>
+                        <tr><td><code>len(x)</code></td><td>Length of string/list/map</td><td><code>len("abc") → 3</code></td></tr>
+                        <tr><td><code>str(x)</code></td><td>Convert to string</td><td><code>str(42) → "42"</code></td></tr>
+                        <tr><td><code>int(x)</code></td><td>Convert to integer</td><td><code>int("42") → 42</code></td></tr>
+                        <tr><td><code>float(x)</code></td><td>Convert to float</td><td><code>float(3) → 3.0</code></td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Component: Client -->
+            <section id="comp-client">
+                <h2>Client Component</h2>
+                <p>Represents users sending requests to your system. In tests, the client sends predefined requests and checks responses.</p>
+                <div class="callout">
+                    <i class="fas fa-info-circle"></i>
+                    <div>You don't write code for the Client. It's driven by test cases. Think of it as millions of users hitting your API.</div>
+                </div>
+            </section>
+
+            <!-- Component: HTTP Server -->
+            <section id="comp-server">
+                <h2>HTTP Server Component</h2>
+                <p>Handles incoming requests. You write handler functions that receive a request and return a response.</p>
+
+                <h3>Request object</h3>
+<pre><code>// Your handler receives:
+fn my_handler(req) {
+    req.method   // "GET", "POST", "PUT", "DELETE"
+    req.path     // "/register", "/users"
+    req.body     // map with request data
+    req.params   // URL parameters
+}</code></pre>
+
+                <h3>Response format</h3>
+<pre><code>// Return a map with status + body:
+return { status: 200, body: { data: "value" } };
+return { status: 404, body: "Not found" };
+return { status: 201, body: { created: true } };</code></pre>
+
+                <h3>Connected component access</h3>
+                <p>When you connect a Database or Cache to your server in the graph, their APIs become available as variables:</p>
+<pre><code>// If server is connected to a Database (alias: "db"):
+let rows = db.query("SELECT * FROM users", []);
+db.execute("INSERT INTO users (name) VALUES (?)", ["Alice"]);
+
+// If server is connected to a Cache (alias: "cache"):
+let val = cache.get("key");
+cache.set("key", "value", 3600);</code></pre>
+            </section>
+
+            <!-- Component: Database -->
+            <section id="comp-database">
+                <h2>Database Component</h2>
+                <p>In-memory relational storage with SQL-like queries.</p>
+                <table>
+                    <thead><tr><th>Method</th><th>Description</th><th>Returns</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>db.query(sql, params)</code></td><td>Query rows</td><td>List of maps</td></tr>
+                        <tr><td><code>db.execute(sql, params)</code></td><td>Insert/Update/Delete</td><td><code>{ affected_rows: N }</code></td></tr>
+                        <tr><td><code>db.createTable(name, columns)</code></td><td>Create a table</td><td>null</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Component: Cache -->
+            <section id="comp-cache">
+                <h2>Cache Component</h2>
+                <p>Key-value store with optional TTL (time-to-live in seconds).</p>
+                <table>
+                    <thead><tr><th>Method</th><th>Description</th><th>Returns</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>cache.get(key)</code></td><td>Get value</td><td>Value or null</td></tr>
+                        <tr><td><code>cache.set(key, value, ttl)</code></td><td>Set value (ttl optional)</td><td>null</td></tr>
+                        <tr><td><code>cache.del(key)</code></td><td>Delete key</td><td>true/false</td></tr>
+                        <tr><td><code>cache.has(key)</code></td><td>Check if key exists</td><td>true/false</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- SQL Reference -->
+            <section id="sql-select">
+                <h2>SELECT</h2>
+<pre><code>// All rows
+let rows = db.query("SELECT * FROM cars", []);
+
+// With WHERE (parameterized)
+let rows = db.query("SELECT * FROM cars WHERE plate = ?", ["ABC123"]);
+
+// Result: list of maps
+// [ { plate: "ABC123", owner: "Alice" } ]</code></pre>
+            </section>
+
+            <section id="sql-insert">
+                <h2>INSERT</h2>
+<pre><code>db.execute(
+    "INSERT INTO cars (plate, owner) VALUES (?, ?)",
+    ["ABC123", "Alice"]
+);
+// Returns: { affected_rows: 1 }</code></pre>
+            </section>
+
+            <section id="sql-update">
+                <h2>UPDATE</h2>
+<pre><code>db.execute(
+    "UPDATE cars SET owner = ? WHERE plate = ?",
+    ["Bob", "ABC123"]
+);
+// Returns: { affected_rows: 1 }</code></pre>
+            </section>
+
+            <section id="sql-delete">
+                <h2>DELETE</h2>
+<pre><code>db.execute(
+    "DELETE FROM cars WHERE plate = ?",
+    ["ABC123"]
+);
+// Returns: { affected_rows: 1 }</code></pre>
+            </section>
+        </main>
+    </div>
+
+    <script type="module">import './js/theme.js';</script>
+    <script>
+        // Highlight active sidebar link on scroll
+        const links = document.querySelectorAll('.sidebar-link');
+        const sections = document.querySelectorAll('.docs-content section');
+        const content = document.querySelector('.docs-content');
+        content.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(s => {
+                if (s.offsetTop - content.scrollTop <= 80) current = s.id;
+            });
+            links.forEach(l => {
+                l.classList.toggle('active', l.getAttribute('href') === '#' + current);
+            });
+        });
+    </script>
+</body>
+</html>
