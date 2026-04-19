@@ -184,6 +184,102 @@ fn handle_del(req) {
             },
         ],
     },
+    {
+        id: 'user-directory',
+        name: 'User Directory',
+        difficulty: 'Beginner',
+        description: `# User Directory
+
+Build a user directory service with lookup by username.
+
+## Requirements
+
+- **POST /users** — Create a new user with \`username\` and \`email\`
+  - If username already exists, return **409**
+  - Otherwise return **201** with \`{ created: true }\`
+- **POST /lookup** — Look up a user by \`username\`
+  - If found, return **200** with \`{ username, email }\`
+  - If not found, return **404**
+
+## Your Task
+
+1. Design the database schema (what table and columns do you need?)
+2. Write the handler functions
+
+## Hints
+
+- Use \`db.FindOne()\` to check if a username exists
+- Use \`db.Insert()\` to add new users
+`,
+        graph: {
+            components: [
+                { id: 'client', type: 'Client', x: 50, y: 150 },
+                { id: 'server', type: 'HttpServer', x: 280, y: 150 },
+                { id: 'db', type: 'Database', x: 520, y: 150 },
+            ],
+            connections: [
+                { from: 'server', to: 'db', alias: 'db' },
+            ],
+        },
+        starterCode: {
+            server: `fn handle_create(req) {
+    // TODO: Create a new user
+    // 1. Check if username exists
+    // 2. If yes, return 409
+    // 3. If no, insert and return 201
+    return { status: 500, body: "Not implemented" };
+}
+
+fn handle_lookup(req) {
+    // TODO: Look up user by username
+    // 1. Find user in db
+    // 2. Return 200 with user data, or 404
+    return { status: 500, body: "Not implemented" };
+}`,
+        },
+        routes: [
+            { componentId: 'server', method: 'POST', path: '/users', handler: 'handle_create' },
+            { componentId: 'server', method: 'POST', path: '/lookup', handler: 'handle_lookup' },
+        ],
+        testCases: [
+            {
+                name: 'Create a new user',
+                steps: [
+                    { client: 'client', target: 'server', method: 'POST', path: '/users',
+                      body: { username: 'alice', email: 'alice@test.com' }, timestamp: 0 },
+                ],
+                expectations: [{ status: 201, body: { created: true } }],
+            },
+            {
+                name: 'Duplicate username returns 409',
+                steps: [
+                    { client: 'client', target: 'server', method: 'POST', path: '/users',
+                      body: { username: 'bob', email: 'bob@test.com' }, timestamp: 0 },
+                    { client: 'client', target: 'server', method: 'POST', path: '/users',
+                      body: { username: 'bob', email: 'other@test.com' }, timestamp: 10 },
+                ],
+                expectations: [{ status: 201 }, { status: 409 }],
+            },
+            {
+                name: 'Lookup existing user',
+                steps: [
+                    { client: 'client', target: 'server', method: 'POST', path: '/users',
+                      body: { username: 'charlie', email: 'charlie@test.com' }, timestamp: 0 },
+                    { client: 'client', target: 'server', method: 'POST', path: '/lookup',
+                      body: { username: 'charlie' }, timestamp: 10 },
+                ],
+                expectations: [{ status: 201 }, { status: 200, body: { username: 'charlie', email: 'charlie@test.com' } }],
+            },
+            {
+                name: 'Lookup missing user returns 404',
+                steps: [
+                    { client: 'client', target: 'server', method: 'POST', path: '/lookup',
+                      body: { username: 'nobody' }, timestamp: 0 },
+                ],
+                expectations: [{ status: 404 }],
+            },
+        ],
+    },
 ];
 
 export class ProblemLoader {

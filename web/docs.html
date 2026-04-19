@@ -31,6 +31,8 @@
                     <div class="sidebar-title">Getting Started</div>
                     <a href="#overview" class="sidebar-link active">Overview</a>
                     <a href="#quickstart" class="sidebar-link">Quick Start</a>
+                    <a href="#graph-editor" class="sidebar-link">Graph Editor</a>
+                    <a href="#schema-design" class="sidebar-link">Schema Design</a>
                 </div>
                 <div class="sidebar-section">
                     <div class="sidebar-title">SysLang Reference</div>
@@ -65,25 +67,35 @@
             <!-- Overview -->
             <section id="overview">
                 <h1>SystemForge Documentation</h1>
-                <p>SystemForge is a platform for learning system design by building real systems. You wire components together in a visual graph editor and write handler logic in <strong>SysLang</strong> — a simple scripting language.</p>
+                <p>SystemForge is a platform for learning system design by building real systems. You wire components together in a visual graph editor, design your database schemas, and write handler logic in <strong>SysLang</strong> — a simple scripting language.</p>
 
                 <div class="callout">
                     <i class="fas fa-lightbulb"></i>
                     <div>
-                        <strong>How it works:</strong> Select a problem, connect components (servers, databases, caches), write handlers, and run tests. Your architecture is validated against test cases — just like LeetCode, but for distributed systems.
+                        <strong>How it works:</strong> Select a problem, connect components (servers, databases, caches), design your database schema, write handlers, and run tests. Your architecture is validated against test cases — just like LeetCode, but for distributed systems.
                     </div>
                 </div>
+
+                <h3>Components</h3>
+                <table>
+                    <thead><tr><th>Component</th><th>Purpose</th><th>You write code?</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>Client</strong></td><td>Sends test requests to your system</td><td>No — driven by test cases</td></tr>
+                        <tr><td><strong>HTTP Server</strong></td><td>Handles requests, runs your handler functions</td><td>Yes</td></tr>
+                        <tr><td><strong>Database</strong></td><td>Relational storage with typed schema</td><td>You design the schema</td></tr>
+                        <tr><td><strong>Cache</strong></td><td>Fast key-value store</td><td>No — use via API</td></tr>
+                    </tbody>
+                </table>
             </section>
 
             <!-- Quick Start -->
             <section id="quickstart">
                 <h2>Quick Start</h2>
                 <ol>
-                    <li>Go to <a href="workspace.html">Problems</a> and select <strong>Car Registration</strong></li>
-                    <li>The graph shows: Client → HTTP Server → Database</li>
-                    <li><strong>Design your schema</strong> — double-click the Database node to define tables and columns</li>
-                    <li>Click the server node to open the code editor</li>
-                    <li>Implement the <code>handle_register</code> function</li>
+                    <li>Go to <a href="workspace.html">Problems</a> and select a problem</li>
+                    <li>Review the problem description on the left</li>
+                    <li><strong>Design your schema</strong> — right-click the Database node and select "Edit Schema"</li>
+                    <li><strong>Write your handler</strong> — click the HTTP Server node to open the code editor</li>
                     <li>Click <strong>Run</strong> (or Ctrl+Enter) to test your solution</li>
                 </ol>
 
@@ -105,6 +117,73 @@ return {
     status: 201,
     body: { registered: true }
 };</code></pre>
+            </section>
+
+            <!-- Graph Editor -->
+            <section id="graph-editor">
+                <h2>Graph Editor</h2>
+                <p>The graph editor is the center of the workspace. Use it to build your system architecture.</p>
+
+                <table>
+                    <thead><tr><th>Action</th><th>How</th></tr></thead>
+                    <tbody>
+                        <tr><td>Add a component</td><td>Click a palette button (top-right) or right-click empty space</td></tr>
+                        <tr><td>Move a component</td><td>Click and drag</td></tr>
+                        <tr><td>Connect components</td><td>Drag from one port (circle) to another</td></tr>
+                        <tr><td>Edit code</td><td>Right-click HTTP Server → "Edit Code", or click the node</td></tr>
+                        <tr><td>Edit database schema</td><td>Right-click Database → "Edit Schema"</td></tr>
+                        <tr><td>Delete</td><td>Right-click → "Delete Component" or select + Backspace</td></tr>
+                        <tr><td>Pan</td><td>Click and drag on empty space</td></tr>
+                        <tr><td>Zoom</td><td>Mouse wheel</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="callout">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <strong>Connections matter:</strong> When you connect a server to a database with alias "db", the variable <code>db</code> becomes available in your handler code. The alias is the variable name.
+                    </div>
+                </div>
+            </section>
+
+            <!-- Schema Design -->
+            <section id="schema-design">
+                <h2>Schema Design</h2>
+                <p>When you place a Database component, you need to define its schema — the tables and columns it contains. This is part of the design challenge.</p>
+
+                <h3>How to define a schema</h3>
+                <ol>
+                    <li>Right-click the Database node → <strong>Edit Schema</strong></li>
+                    <li>Click <strong>Add Table</strong> to create a new table</li>
+                    <li>Name the table and add columns with types</li>
+                    <li>Click <strong>Save Schema</strong></li>
+                </ol>
+
+                <h3>Column types</h3>
+                <table>
+                    <thead><tr><th>Type</th><th>Description</th><th>Example values</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>string</code></td><td>Text data</td><td><code>"Alice"</code>, <code>"ABC123"</code></td></tr>
+                        <tr><td><code>int</code></td><td>Whole numbers</td><td><code>42</code>, <code>0</code>, <code>-1</code></td></tr>
+                        <tr><td><code>float</code></td><td>Decimal numbers</td><td><code>3.14</code>, <code>99.9</code></td></tr>
+                        <tr><td><code>bool</code></td><td>True or false</td><td><code>true</code>, <code>false</code></td></tr>
+                        <tr><td><code>any</code></td><td>No type checking</td><td>Any value</td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Schema validation</h3>
+                <p>Operations are validated against your schema at runtime:</p>
+                <ul>
+                    <li><strong>Unknown columns</strong> — inserting or filtering on a column that doesn't exist returns an error</li>
+                    <li><strong>Type mismatch</strong> — inserting a string into an <code>int</code> column returns an error</li>
+                    <li><strong>Missing table</strong> — operating on a table that doesn't exist returns an error</li>
+                </ul>
+
+<pre><code>// If your "cars" table has columns: plate (string), owner (string)
+
+db.Insert("cars", { plate: "ABC", owner: "Alice" });  // OK
+db.Insert("cars", { plate: "ABC", color: "red" });     // Error: unknown column 'color'
+db.Insert("nonexistent", { a: 1 });                    // Error: Table not found</code></pre>
             </section>
 
             <!-- SysLang: Variables -->
@@ -135,15 +214,6 @@ fn add(a, b) {
     return a + b;
 }
 
-// Functions can call other functions
-fn process(plate) {
-    let result = validate_plate(plate);
-    if (!result.ok) {
-        log("Invalid: " + result.error);
-    }
-    return result;
-}
-
 // Recursion works
 fn factorial(n) {
     if (n <= 1) { return 1; }
@@ -159,7 +229,7 @@ fn factorial(n) {
 let add = [](a, b) { return a + b; };
 let result = add(3, 4);  // 7
 
-// With capture (captured by value)
+// With capture
 let threshold = 100;
 let check = [threshold](val) { return val > threshold; };
 check(150);  // true
@@ -175,7 +245,7 @@ add5(3);  // 8</code></pre>
             <!-- Control Flow -->
             <section id="control-flow">
                 <h2>Control Flow</h2>
-<pre><code>// if / else if / else
+<pre><code>// if / else
 if (count > 10) {
     log("too many");
 } else if (count == 0) {
@@ -194,12 +264,7 @@ let i = 0;
 while (i < 10) {
     log(i);
     i = i + 1;
-}
-
-// Logical operators
-if (a > 0 && b > 0) { log("both positive"); }
-if (a > 0 || b > 0) { log("at least one positive"); }
-if (!active) { log("inactive"); }</code></pre>
+}</code></pre>
             </section>
 
             <!-- Match -->
@@ -210,7 +275,6 @@ if (!active) { log("inactive"); }</code></pre>
     return match (req.method) {
         "GET"  => get_data(req),
         "POST" => create_data(req),
-        "PUT"  => update_data(req),
         _      => { status: 405, body: "Method not allowed" }
     };
 }</code></pre>
@@ -223,28 +287,14 @@ if (!active) { log("inactive"); }</code></pre>
 <pre><code>let items = [1, 2, 3];
 items.push(4);              // [1, 2, 3, 4]
 let first = items[0];       // 1
-let count = items.size();   // 4
-let last = items.pop();     // 4 (removes from list)</code></pre>
+let count = items.size();   // 4</code></pre>
 
                 <h3>Maps</h3>
 <pre><code>let user = { name: "Alice", age: 30 };
 user.email = "alice@example.com";   // add field
-let name = user.name;               // access field
+let name = user.name;               // access
 let has = user.has("email");        // true
-let n = user.size();                // 3
-let keys = user.keys();            // ["age", "email", "name"]</code></pre>
-
-                <h3>Nesting</h3>
-<pre><code>let response = {
-    status: 200,
-    body: {
-        users: [
-            { name: "Alice", role: "admin" },
-            { name: "Bob",   role: "user" }
-        ]
-    }
-};
-let role = response.body.users[0].role;  // "admin"</code></pre>
+let keys = user.keys();             // ["age", "email", "name"]</code></pre>
             </section>
 
             <!-- Strings -->
@@ -255,7 +305,6 @@ s.length();              // 11
 s.contains("world");     // true
 s.split(" ");            // ["hello", "world"]
 s.upper();               // "HELLO WORLD"
-s.lower();               // "hello world"
 s.substr(0, 5);          // "hello"
 s + " !!!";              // "hello world !!!"</code></pre>
             </section>
@@ -292,8 +341,7 @@ s + " !!!";              // "hello world !!!"</code></pre>
                 <p>Handles incoming requests. You write handler functions that receive a request and return a response.</p>
 
                 <h3>Request object</h3>
-<pre><code>// Your handler receives:
-fn my_handler(req) {
+<pre><code>fn my_handler(req) {
     req.method   // "GET", "POST", "PUT", "DELETE"
     req.path     // "/register", "/users"
     req.body     // map with request data
@@ -301,26 +349,26 @@ fn my_handler(req) {
 }</code></pre>
 
                 <h3>Response format</h3>
-<pre><code>// Return a map with status + body:
-return { status: 200, body: { data: "value" } };
+<pre><code>return { status: 200, body: { data: "value" } };
 return { status: 404, body: "Not found" };
 return { status: 201, body: { created: true } };</code></pre>
 
                 <h3>Connected component access</h3>
-                <p>When you connect a Database or Cache to your server in the graph, their APIs become available as variables:</p>
-<pre><code>// If server is connected to a Database (alias: "db"):
+                <p>When you connect a Database or Cache to your server, their APIs become available as variables (the alias from the connection):</p>
+<pre><code>// Connected to Database with alias "db":
 let car = db.FindOne("cars", { plate: "ABC123" });
 db.Insert("cars", { plate: "ABC123", owner: "Alice" });
 
-// If server is connected to a Cache (alias: "cache"):
+// Connected to Cache with alias "cache":
 let val = cache.get("key");
-cache.set("key", "value", 3600);</code></pre>
+cache.set("key", "value");</code></pre>
             </section>
 
             <!-- Component: Database -->
             <section id="comp-database">
                 <h2>Database Component</h2>
-                <p>In-memory relational database with a functional API. No SQL — just simple function calls with maps.</p>
+                <p>In-memory relational database with a functional API and schema validation. No SQL — just function calls with maps.</p>
+                <p>Right-click the Database node → <strong>Edit Schema</strong> to define tables and columns before using it.</p>
                 <table>
                     <thead><tr><th>Method</th><th>Description</th><th>Returns</th></tr></thead>
                     <tbody>
@@ -333,19 +381,19 @@ cache.set("key", "value", 3600);</code></pre>
                         <tr><td><code>db.Count(table, filter)</code></td><td>Count matching rows</td><td>Number</td></tr>
                     </tbody>
                 </table>
-                <p>The <code>filter</code> argument is a map of column-value pairs. All must match (AND logic). An empty filter <code>{}</code> matches all rows.</p>
+                <p>The <code>filter</code> argument is a map of column-value pairs. All must match (AND logic). Empty filter <code>{}</code> matches all rows.</p>
             </section>
 
             <!-- Component: Cache -->
             <section id="comp-cache">
                 <h2>Cache Component</h2>
-                <p>Key-value store with optional TTL (time-to-live in seconds).</p>
+                <p>Fast key-value store. Use it for caching frequently accessed data.</p>
                 <table>
                     <thead><tr><th>Method</th><th>Description</th><th>Returns</th></tr></thead>
                     <tbody>
-                        <tr><td><code>cache.get(key)</code></td><td>Get value</td><td>Value or null</td></tr>
-                        <tr><td><code>cache.set(key, value, ttl)</code></td><td>Set value (ttl optional)</td><td>null</td></tr>
-                        <tr><td><code>cache.del(key)</code></td><td>Delete key</td><td>true/false</td></tr>
+                        <tr><td><code>cache.get(key)</code></td><td>Get value by key</td><td>Value or null</td></tr>
+                        <tr><td><code>cache.set(key, value)</code></td><td>Store a value</td><td>null</td></tr>
+                        <tr><td><code>cache.del(key)</code></td><td>Delete a key</td><td>true/false</td></tr>
                         <tr><td><code>cache.has(key)</code></td><td>Check if key exists</td><td>true/false</td></tr>
                     </tbody>
                 </table>
@@ -369,43 +417,31 @@ let all = db.Find("cars", {});</code></pre>
             <section id="db-insert">
                 <h2>Insert</h2>
 <pre><code>db.Insert("cars", { plate: "ABC123", owner: "Alice" });
-// Returns: { inserted: true }
-
-// Insert with any columns your table has
-db.Insert("users", { name: "Bob", email: "bob@test.com", age: 30 });</code></pre>
+// Returns: { inserted: true }</code></pre>
             </section>
 
             <section id="db-update">
                 <h2>Update</h2>
 <pre><code>// Update matching rows: (table, filter, updates)
 db.Update("cars", { plate: "ABC123" }, { owner: "Bob" });
-// Returns: { updated: 1 }
-
-// Update multiple rows at once
-db.Update("users", { role: "admin" }, { verified: true });
-// Returns: { updated: N }</code></pre>
+// Returns: { updated: 1 }</code></pre>
             </section>
 
             <section id="db-delete">
                 <h2>Delete</h2>
 <pre><code>db.Delete("cars", { plate: "ABC123" });
-// Returns: { deleted: 1 }
-
-// Delete all matching rows
-db.Delete("sessions", { expired: true });</code></pre>
+// Returns: { deleted: 1 }</code></pre>
             </section>
 
             <section id="db-all-count">
                 <h2>All / Count</h2>
 <pre><code>// Get all rows in a table
 let cars = db.All("cars");
-// Returns: [ { plate: "ABC123", owner: "Alice" }, ... ]
 
 // Count rows matching a filter
 let n = db.Count("cars", { owner: "Alice" });
-// Returns: 2
 
-// Count all rows (empty filter)
+// Count all rows
 let total = db.Count("cars", {});</code></pre>
             </section>
         </main>
@@ -413,7 +449,6 @@ let total = db.Count("cars", {});</code></pre>
 
     <script type="module">import './js/theme.js';</script>
     <script>
-        // Highlight active sidebar link on scroll
         const links = document.querySelectorAll('.sidebar-link');
         const sections = document.querySelectorAll('.docs-content section');
         const content = document.querySelector('.docs-content');
