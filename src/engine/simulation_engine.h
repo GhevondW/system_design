@@ -6,6 +6,7 @@
 
 #include "engine/clock.h"
 #include "engine/event_queue.h"
+#include "engine/fiber_runtime.h"
 #include "engine/graph.h"
 #include "lang/interpreter.h"
 
@@ -47,18 +48,27 @@ public:
     [[nodiscard]] const std::vector<std::string>& GetLogs() const;
     [[nodiscard]] lang::Interpreter& GetInterpreter();
     [[nodiscard]] Graph& GetGraph();
+    [[nodiscard]] FiberRuntime& GetFiberRuntime();
+
+    // Config
+    void SetAsyncMode(bool enabled);
+    [[nodiscard]] bool IsAsyncMode() const;
 
 private:
     void EnsureWired();
     void WireConnections();
+    void WireAsyncConnections();
     void ProcessEvent(const Event& event);
+    void DrainFiberEvents();
     bool wired_ = false;
-    std::vector<lang::StmtList> loaded_programs_;  // keep ASTs alive for closures
+    bool async_mode_ = false;
+    std::vector<lang::StmtList> loaded_programs_;
 
     Graph graph_;
     EventQueue event_queue_;
     SimulationClock clock_;
     lang::Interpreter interpreter_;
+    FiberRuntime fiber_runtime_;
     LatencyConfig latency_config_;
     int events_processed_ = 0;
 };

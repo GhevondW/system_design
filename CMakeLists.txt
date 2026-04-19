@@ -52,6 +52,7 @@ add_library(systemforge_engine STATIC
     src/components/http_server.cpp
     src/components/database.cpp
     src/components/cache.cpp
+    src/engine/fiber_runtime.cpp
     src/engine/simulation_engine.cpp
     src/engine/test_runner.cpp
     src/bridge/bridge.cpp
@@ -121,6 +122,7 @@ else()
         tests/engine/simulation_engine_test.cpp
         tests/engine/test_runner_test.cpp
         tests/bridge/bridge_test.cpp
+        tests/engine/fiber_runtime_test.cpp
     )
 
     target_link_libraries(systemforge_tests PRIVATE
